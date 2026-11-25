@@ -1,0 +1,2213 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Side Letter Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+/* Layout: registry-style working tool. Sticky top bar with section tabs, one content column (max 1180px), cards only for things that act as separate objects. Clause text set in serif like the signed letter; data and hashes in mono. */
+:root {
+  --bg: #F3F5F8; --surface: #FFFFFF; --surface-2: #EBEEF3; --line: #D5DBE4; --line-2: #E3E7EE;
+  --ink: #142033; --ink-2: #43506A; --ink-3: #66738A;
+  --accent: #2C4C94; --accent-ink: #FFFFFF; --accent-soft: #E2E9F7;
+  --clause: #F8F7F2; --clause-rule: #B9A979;
+  --ok: #1C7148; --ok-soft: #DFF1E7; --warn: #8C5A00; --warn-soft: #FAEBCB; --bad: #B0261B; --bad-soft: #FBE3E0; --info: #2C4C94; --info-soft: #E2E9F7;
+  --cat: #4B3F8C; --cat-soft: #ECE9F8;
+  --f-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-clause: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 6px; --shadow: 0 1px 2px rgba(20, 32, 51, .06);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E131B; --surface: #151C27; --surface-2: #1C2533; --line: #2B3646; --line-2: #222C3A;
+  --ink: #E5EAF2; --ink-2: #B2BCCC; --ink-3: #8B97AA;
+  --accent: #93ABEA; --accent-ink: #0E131B; --accent-soft: #1F2B47;
+  --clause: #1A2029; --clause-rule: #8A7C52;
+  --ok: #67C695; --ok-soft: #14301F; --warn: #E3B254; --warn-soft: #33270E; --bad: #F2897E; --bad-soft: #3B1A16; --info: #93ABEA; --info-soft: #1F2B47;
+  --cat: #B7AAF2; --cat-soft: #282244; --shadow: none; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0E131B; --surface: #151C27; --surface-2: #1C2533; --line: #2B3646; --line-2: #222C3A;
+  --ink: #E5EAF2; --ink-2: #B2BCCC; --ink-3: #8B97AA;
+  --accent: #93ABEA; --accent-ink: #0E131B; --accent-soft: #1F2B47;
+  --clause: #1A2029; --clause-rule: #8A7C52;
+  --ok: #67C695; --ok-soft: #14301F; --warn: #E3B254; --warn-soft: #33270E; --bad: #F2897E; --bad-soft: #3B1A16; --info: #93ABEA; --info-soft: #1F2B47;
+  --cat: #B7AAF2; --cat-soft: #282244; --shadow: none; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-ui); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.6rem; line-height: 1.2; } h2 { font-size: 1.15rem; margin-top: 1.6rem; } h3 { font-size: 1rem; }
+p { margin: 0; }
+code, .mono { font-family: var(--f-mono); font-size: .86em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-3); } .small { font-size: .85rem; } .bad-text { color: var(--bad); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 7px 9px; min-width: 0; max-width: 100%; }
+textarea { width: 100%; resize: vertical; line-height: 1.45; }
+input[type="checkbox"] { accent-color: var(--accent); }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+fieldset:disabled input, fieldset:disabled select, fieldset:disabled textarea { background: var(--surface-2); color: var(--ink-2); }
+
+.app { min-height: 100%; }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-in, .tabs-in, .alertbar-in, main { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px 6px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--ink); min-width: 0; }
+.brand:hover { text-decoration: none; }
+.brand .mark { font-family: var(--f-clause); font-size: 1.6rem; line-height: 1; color: var(--accent); width: 32px; height: 32px; display: grid; place-items: center; border: 1.5px solid var(--accent); border-radius: 4px; flex: none; }
+.brand strong { display: block; font-size: 1rem; }
+.brand .fund { display: block; font-size: .78rem; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.busy { font-size: .8rem; color: var(--accent); }
+.tabs { overflow-x: auto; scrollbar-width: none; } .tabs::-webkit-scrollbar { display: none; }
+.tabs-in { display: flex; gap: 2px; }
+.tabs a { padding: 8px 12px 9px; color: var(--ink-2); border-bottom: 2px solid transparent; white-space: nowrap; display: flex; gap: 6px; align-items: center; font-weight: 500; }
+.tabs a:hover { color: var(--ink); text-decoration: none; }
+.tabs a.on { color: var(--accent); border-bottom-color: var(--accent); }
+.badge { font-size: .72rem; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--warn-soft); color: var(--warn); display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
+.badge.alert { background: var(--bad-soft); color: var(--bad); }
+.alertbar { background: var(--bad-soft); color: var(--bad); border-bottom: 1px solid var(--line); }
+.alertbar-in { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-block: 8px; font-size: .88rem; align-items: baseline; }
+.alertbar a { color: var(--bad); text-decoration: underline; }
+main { padding-block: 22px 60px; }
+
+.view { display: flex; flex-direction: column; gap: 14px; }
+.view.narrow { max-width: 780px; }
+.view-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.view-h > div:first-child { min-width: 0; flex: 1 1 320px; display: flex; flex-direction: column; gap: 4px; }
+.back { font-size: .85rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row.end { justify-content: flex-end; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.review-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr); gap: 16px; align-items: start; }
+.review-grid .doc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 96px); max-height: calc(100vh - 120px); overflow: auto; }
+.view.wide { max-width: none; }
+@media (max-width: 860px) { .two, .review-grid { grid-template-columns: minmax(0, 1fr); } .review-grid .doc { position: static; max-height: none; } }
+
+.btn { font: inherit; font-weight: 500; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 13px; border-radius: var(--r); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; }
+.btn:hover:not(:disabled) { background: var(--surface-2); text-decoration: none; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.small { padding: 4px 9px; font-size: .84rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.linkbtn { font: inherit; background: none; border: 0; color: var(--accent); padding: 0; cursor: pointer; }
+.linkbtn:disabled { color: var(--ink-3); cursor: not-allowed; }
+.chip { font: inherit; font-size: .84rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); padding: 5px 10px; border-radius: 999px; cursor: pointer; text-align: left; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; font-weight: 500; padding: 2px 8px; border-radius: 999px; white-space: nowrap; letter-spacing: .01em; }
+.pill-ok { background: var(--ok-soft); color: var(--ok); } .pill-warn { background: var(--warn-soft); color: var(--warn); } .pill-bad { background: var(--bad-soft); color: var(--bad); }
+.pill-info { background: var(--info-soft); color: var(--info); } .pill-neutral { background: var(--surface-2); color: var(--ink-2); } .pill-cat { background: var(--cat-soft); color: var(--cat); }
+
+.search-hero { display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.search-hero h1 { font-size: 1.8rem; }
+.askbar { display: flex; gap: 8px; }
+.askbar input { flex: 1; font-size: 1.05rem; padding: 11px 14px; border-width: 1.5px; }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.note { background: var(--info-soft); color: var(--ink); border-radius: var(--r); padding: 10px 12px; font-size: .88rem; display: flex; flex-direction: column; gap: 8px; }
+.note.warn { background: var(--warn-soft); } .note.bad { background: var(--bad-soft); }
+.filterbar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; }
+.filter-used { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 400px; }
+.filter-actions { display: flex; gap: 6px; align-items: flex-start; }
+.eyebrow { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-weight: 600; }
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fchip { background: var(--accent-soft); color: var(--accent); font-size: .82rem; padding: 3px 9px; border-radius: 4px; }
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px 16px; }
+.filters .wide { grid-column: 1 / -1; }
+.toggles { display: flex; flex-wrap: wrap; gap: 5px; }
+.toggles button, .seg button { font: inherit; font-size: .82rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); padding: 4px 9px; border-radius: 4px; cursor: pointer; }
+.toggles button.on, .seg button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; } .seg button:last-child { border-radius: 0 4px 4px 0; }
+.seg button:disabled { cursor: not-allowed; }
+.checks { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; }
+.check { display: flex; gap: 8px; align-items: center; font-size: .88rem; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.flabel { font-size: .76rem; font-weight: 600; color: var(--ink-2); letter-spacing: .02em; }
+.fhint { font-size: .76rem; color: var(--ink-3); }
+.field input, .field select { width: 100%; }
+.results-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.results-head h2 { margin: 0; }
+.results { display: flex; flex-direction: column; gap: 12px; }
+
+.term { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; min-width: 0; box-shadow: var(--shadow); }
+.term.editor.draft { border-left: 3px solid var(--warn); }
+.term.editor.approved { border-left: 3px solid var(--ok); }
+.term.editor.rejected, .term.editor.superseded { opacity: .7; }
+.term-h { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.term-h .lp { font-weight: 600; margin-right: 4px; }
+.summary { font-weight: 500; }
+.clause { margin: 0; background: var(--clause); border-left: 2px solid var(--clause-rule); padding: 9px 12px; font-family: var(--f-clause); font-size: .95rem; line-height: 1.55; color: var(--ink); overflow-wrap: anywhere; }
+.pmark { font-family: var(--f-mono); font-size: .74rem; color: var(--ink-3); margin-right: 8px; white-space: nowrap; }
+mark { background: var(--warn-soft); color: inherit; padding: 0 1px; border-radius: 2px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 16px; margin: 0; }
+.facts div { min-width: 0; } .facts dt { font-size: .72rem; color: var(--ink-3); font-weight: 600; letter-spacing: .02em; } .facts dd { margin: 0; font-size: .88rem; overflow-wrap: anywhere; }
+.bundle-box { border: 1px dashed var(--line); border-radius: var(--r); padding: 9px 12px; font-size: .88rem; display: flex; flex-direction: column; gap: 4px; }
+.bundle-box ul, .bundle-card ul, .pitem ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.prov { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .78rem; color: var(--ink-3); border-top: 1px solid var(--line-2); padding-top: 7px; }
+.flags { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.flag { font-size: .84rem; padding: 5px 9px; border-radius: 4px; background: var(--warn-soft); color: var(--warn); }
+.flag.quote, .flag.model, .flag.second { background: var(--bad-soft); color: var(--bad); }
+.egrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px 14px; }
+.quote-in { font-family: var(--f-clause); background: var(--clause); }
+.quote-in.fail { border-color: var(--bad); }
+.quote-in.pass { border-color: var(--ok); }
+.newbundle { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; border: 1px dashed var(--line); padding: 10px; border-radius: var(--r); }
+.issue { border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: var(--r); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+.issue input { flex: 1 1 220px; }
+
+.paras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.para { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; padding: 8px 6px; border-radius: 4px; }
+.para p { font-family: var(--f-clause); font-size: .93rem; line-height: 1.55; overflow-wrap: anywhere; }
+.para .pn { font-family: var(--f-mono); font-size: .76rem; color: var(--ink-3); padding-top: 3px; }
+.para.p-unaccounted { background: var(--warn-soft); }
+.para.p-none p { color: var(--ink-3); }
+.para .row { margin-top: 4px; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.tbl { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.tbl th { text-align: left; font-size: .74rem; font-weight: 600; color: var(--ink-3); letter-spacing: .03em; padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--surface-2); }
+.tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .rowlink { cursor: pointer; } .tbl .rowlink:hover td { background: var(--surface-2); }
+.tbl input { width: 100%; min-width: 140px; }
+.empty { border: 1px dashed var(--line); border-radius: var(--r); padding: 22px; text-align: center; color: var(--ink-3); display: flex; flex-direction: column; gap: 6px; }
+.empty strong { color: var(--ink-2); }
+.loading { padding: 40px 0; color: var(--ink-3); }
+
+.integrity.ok { border-left: 3px solid var(--ok); } .integrity.bad { border-left: 3px solid var(--bad); }
+.integ-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hashes { display: flex; flex-direction: column; gap: 6px; }
+.hashes > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hash { font-family: var(--f-mono); font-size: .78rem; overflow-wrap: anywhere; word-break: break-all; color: var(--ink-2); }
+
+.crosscheck h3 { margin: 0; }
+.hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hits li { border-top: 1px solid var(--line-2); padding-top: 9px; display: flex; flex-direction: column; gap: 4px; }
+.hit-h { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.hit-t { font-family: var(--f-clause); font-size: .92rem; color: var(--ink-2); overflow-wrap: anywhere; }
+
+.form h3 { margin-top: 4px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px 16px; }
+.grid2.sub { border: 1px dashed var(--line); padding: 12px; border-radius: var(--r); }
+.grid2 .wide { grid-column: 1 / -1; }
+.drop { display: flex; align-items: center; gap: 10px; border: 1.5px dashed var(--line); border-radius: var(--r); padding: 18px; cursor: pointer; flex-wrap: wrap; }
+.drop input { max-width: 100%; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
+.step { display: flex; gap: 9px; align-items: baseline; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); flex: none; transform: translateY(-1px); }
+.step.ok .dot, .done .dot { background: var(--ok); } .step.warn .dot, .todo .dot { background: var(--warn); } .step.bad .dot { background: var(--bad); }
+.step.run .dot { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .step.run .dot { animation: none; } }
+.checklist { flex-direction: row; flex-wrap: wrap; gap: 8px 22px; font-size: .9rem; }
+.checklist > div { display: flex; gap: 8px; align-items: baseline; }
+
+.subnav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.subnav a { padding: 7px 12px; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.subnav a.on { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+.subnav a:hover { text-decoration: none; color: var(--ink); }
+.pkg-h { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pitem { border: 1px solid var(--line-2); border-radius: var(--r); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: .9rem; }
+.pitem.undecided { border-left: 3px solid var(--warn); } .pitem.include { border-left: 3px solid var(--ok); } .pitem.exclude { opacity: .65; }
+.pkg-actions { border-top: 1px solid var(--line-2); padding-top: 10px; }
+details summary { cursor: pointer; color: var(--accent); font-size: .88rem; }
+
+.metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 10px; }
+.metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; color: var(--ink); border-top: 3px solid var(--line); min-width: 0; }
+.metric:hover { text-decoration: none; border-color: var(--accent); }
+.metric.ok { border-top-color: var(--ok); } .metric.warn { border-top-color: var(--warn); } .metric.bad { border-top-color: var(--bad); }
+.mlabel { font-size: .76rem; font-weight: 600; color: var(--ink-3); }
+.mvalue { font-size: 1.55rem; font-weight: 600; letter-spacing: -0.01em; }
+.metric.bad .mvalue { color: var(--bad); } .metric.warn .mvalue { color: var(--warn); }
+.msub { font-size: .76rem; color: var(--ink-3); }
+.alerts { margin: 0; padding-left: 18px; color: var(--bad); }
+.case { border-top: 1px solid var(--line-2); padding-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.case ul { margin: 0; padding-left: 18px; }
+
+.chain.ok { border-left: 3px solid var(--ok); } .chain.bad { border-left: 3px solid var(--bad); }
+.audit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.audit li { border-bottom: 1px solid var(--line-2); padding: 10px 2px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.audit li.broken { background: var(--bad-soft); }
+.a-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.seq { font-family: var(--f-mono); font-size: .8rem; color: var(--ink-3); }
+.a-d { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.a-d pre { background: var(--surface-2); padding: 10px; border-radius: var(--r); overflow-x: auto; font-size: .78rem; margin: 0; max-width: 100%; }
+.wideinput { min-width: 260px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--r); font-size: .9rem; z-index: 20; max-width: min(560px, calc(100vw - 32px)); box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.toast.bad { background: var(--bad); color: #fff; }
+@media (max-width: 560px) { .askbar { flex-direction: column; } .search-hero h1 { font-size: 1.45rem; } h1 { font-size: 1.35rem; } .brand .fund { max-width: 52vw; } }
+</style>
+<div id="root"></div>
+<script src="https://unpkg.com/htm@3.1.1/preact/standalone.umd.js"></script>
+<script>
+/* ===== Side Letter Tracker: shared core (used by the page and by the seed script) ===== */
+const CORE = (() => {
+  const ZERO_HASH = "0".repeat(64);
+  const PROMPT_VERSIONS = { extract: "extract-v1.0", verify: "verify-v1.0", search: "search-v1.0", similar: "similar-v1.0" };
+  const UNCLEAR = "unclear";
+
+  /* Canonical JSON: sorted keys, no undefined, so the same object always hashes the same way. */
+  function canon(v) {
+    if (v === null || typeof v !== "object") return JSON.stringify(v === undefined ? null : v);
+    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+    const keys = Object.keys(v).filter((k) => v[k] !== undefined).sort();
+    return "{" + keys.map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+  }
+
+  async function sha256Bytes(bytes) {
+    const buf = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  const sha256Text = (s) => sha256Bytes(new TextEncoder().encode(s));
+
+  /* ---- Audit log: every entry carries the previous entry's hash ---- */
+  function auditBody(e) {
+    return { seq: e.seq, ts: e.ts, actor: e.actor, action: e.action, entityType: e.entityType, entityId: e.entityId, summary: e.summary, data: e.data ?? null, prevHash: e.prevHash };
+  }
+  async function hashAuditEntry(e) { return sha256Text(canon(auditBody(e))); }
+  const auditId = (seq) => "e" + String(seq).padStart(8, "0");
+
+  /* Returns {ok, checked, problems:[{seq, kind, message}], bySeq:{seq: "ok"|"broken"}} */
+  async function verifyAuditChain(entries, head) {
+    const list = [...entries].sort((a, b) => a.seq - b.seq);
+    const problems = []; const bySeq = {};
+    let prev = ZERO_HASH; let expectSeq = 1;
+    for (const e of list) {
+      let ok = true;
+      if (e.seq !== expectSeq) {
+        problems.push({ seq: e.seq, kind: "gap", message: e.seq > expectSeq ? `Entries ${expectSeq}–${e.seq - 1} are missing (deleted)` : `Entry ${e.seq} is out of order or duplicated` });
+        ok = false;
+      }
+      if (e.prevHash !== prev) { problems.push({ seq: e.seq, kind: "link", message: `Entry ${e.seq} does not point to the previous entry's hash` }); ok = false; }
+      const h = await hashAuditEntry(e);
+      if (h !== e.hash) { problems.push({ seq: e.seq, kind: "edited", message: `Entry ${e.seq} was changed after it was written (hash mismatch)` }); ok = false; }
+      bySeq[e.seq] = ok ? "ok" : "broken";
+      prev = e.hash; expectSeq = e.seq + 1;
+    }
+    if (head) {
+      const last = list[list.length - 1];
+      if (!last && head.seq > 0) problems.push({ seq: head.seq, kind: "tail", message: `The log head says ${head.seq} entries exist but none were found` });
+      else if (last && (head.seq !== last.seq || head.hash !== last.hash)) problems.push({ seq: head.seq, kind: "tail", message: `The log head (entry ${head.seq}) does not match the last entry found (entry ${last.seq}); entries at the end may have been deleted` });
+    }
+    return { ok: problems.length === 0, checked: list.length, problems, bySeq };
+  }
+
+  /* ---- Text helpers ---- */
+  function normalizeForQuote(s) {
+    return String(s || "")
+      .replace(/[‘’‛′]/g, "'").replace(/[“”‟″]/g, '"')
+      .replace(/[‐-―−]/g, "-").replace(/ /g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+  function documentText(paragraphs) { return (paragraphs || []).join("\n\n"); }
+
+  /* Exact quote check. "pass": the quote appears word-for-word in the document (whitespace and curly quotes normalised). */
+  function quoteCheck(quote, paragraphs) {
+    if (!paragraphs || !paragraphs.length) return { status: "n/a", message: "No source document to check against" };
+    const q = normalizeForQuote(quote);
+    if (!q || q === UNCLEAR) return { status: "fail", message: "No quote given" };
+    if (q.length < 15) return { status: "fail", message: "Quote is too short to identify the clause" };
+    const doc = normalizeForQuote(documentText(paragraphs));
+    if (!doc.includes(q)) return { status: "fail", message: "Quote does not appear word-for-word in the document" };
+    const paras = paragraphs.map((p, i) => (normalizeForQuote(p).includes(q) ? i + 1 : null)).filter(Boolean);
+    return { status: "pass", message: "Found word-for-word", paragraphs: paras };
+  }
+
+  function splitParagraphs(text) {
+    const t = String(text || "").replace(/\r\n?/g, "\n").replace(/ /g, " ");
+    let parts = t.split(/\n[ \t]*\n+/).map((s) => s.replace(/[ \t]*\n[ \t]*/g, " ").replace(/[ \t]+/g, " ").trim()).filter(Boolean);
+    if (parts.length < 3) parts = t.split(/\n+/).map((s) => s.replace(/[ \t]+/g, " ").trim()).filter(Boolean);
+    return parts;
+  }
+
+  /* ---- Terms ---- */
+  const TERM_UNCLEAR_FIELDS = [
+    ["vehicle", "Fund or vehicle"], ["conditions", "Conditions"], ["expiry", "Expiry or trigger"],
+    ["lpStatusBased", "LP-status based"], ["mfnStatus", "MFN status"], ["obligation.is", "Ongoing obligation"], ["obligation.deadline", "Obligation deadline"],
+    ["category", "Category"], ["summary", "Summary"],
+  ];
+  function getPath(o, p) { return p.split(".").reduce((a, k) => (a == null ? a : a[k]), o); }
+  function unclearFields(t) {
+    const out = [];
+    for (const [p, label] of TERM_UNCLEAR_FIELDS) {
+      if (p === "obligation.deadline" && getPath(t, "obligation.is") !== "yes") continue;
+      const v = getPath(t, p);
+      if (typeof v === "string" && v.trim().toLowerCase() === UNCLEAR) out.push({ field: p, label });
+    }
+    return out;
+  }
+  const isLive = (t) => t.status !== "rejected" && t.status !== "superseded";
+
+  /* Flags that need a person to look. Computed, never stored, so they always reflect the current state. */
+  function termFlags(t, letter) {
+    const flags = [];
+    if (letter && letter.source !== "manual") {
+      const qc = quoteCheck(t.quote, letter.paragraphs);
+      if (qc.status === "fail") flags.push({ type: "quote", message: qc.message });
+    }
+    if (!letter || letter.source === "manual" || t.origin === "manual") flags.push({ type: "manual", message: "Entered by hand: check against the signed letter" });
+    if (t.mfnStatus !== "electable" && t.mfnStatus !== "excluded") flags.push({ type: "mfn", message: "MFN status must be set to electable or excluded" });
+    else if (!String(t.mfnReason || "").trim()) flags.push({ type: "mfn", message: "MFN status needs a reason" });
+    for (const u of unclearFields(t)) if (u.field !== "mfnStatus") flags.push({ type: "unclear", message: `${u.label} is unclear` });
+    const pv = t.provenance || {};
+    if (pv.model && pv.modelApplied && pv.model !== pv.modelApplied) flags.push({ type: "model", message: `Extracted by ${pv.modelApplied}, not the pinned model ${pv.model}` });
+    if (pv.model && pv.modelApplied === null) flags.push({ type: "model", message: `The app could not confirm the pinned model ${pv.model} answered` });
+    for (const iss of (letter?.secondPass?.issues || [])) if (!iss.resolved && iss.termId === t.id) flags.push({ type: "second", message: "Second-pass check: " + iss.problem });
+    return flags;
+  }
+
+  /* Paragraph coverage: each paragraph must be cited by a live term or marked "no obligation". */
+  function coverage(letter, terms) {
+    const n = (letter.paragraphs || []).length;
+    const cited = {}; for (let i = 1; i <= n; i++) cited[i] = [];
+    for (const t of terms) if (t.letterId === letter.id && isLive(t)) for (const p of t.paragraphs || []) if (cited[p]) cited[p].push(t.id);
+    const noObl = new Set(letter.noObligation || []);
+    const rows = []; const unaccounted = [];
+    for (let i = 1; i <= n; i++) {
+      const state = cited[i].length ? "term" : noObl.has(i) ? "none" : "unaccounted";
+      rows.push({ n: i, state, termIds: cited[i] });
+      if (state === "unaccounted") unaccounted.push(i);
+    }
+    return { rows, unaccounted };
+  }
+
+  function letterFlags(letter, terms) {
+    const out = [];
+    if (letter.source === "manual") return out;
+    for (const p of coverage(letter, terms).unaccounted) out.push({ type: "coverage", paragraph: p, message: `Paragraph ${p} is not linked to a term or marked "no obligation"` });
+    for (const iss of letter.secondPass?.issues || []) if (!iss.resolved && !iss.termId) out.push({ type: "second", paragraph: iss.paragraph, message: "Second-pass check: " + iss.problem, issueId: iss.id });
+    return out;
+  }
+
+  /* ---- Monitoring ---- */
+  function metrics({ letters, terms, testRuns, config }) {
+    const byLetter = Object.fromEntries(letters.map((l) => [l.id, l]));
+    let flagged = 0, unclear = 0, modelFallbacks = 0;
+    for (const t of terms) {
+      if (!isLive(t)) continue;
+      unclear += unclearFields(t).length;
+      const pv = t.provenance || {};
+      if (pv.model && pv.modelApplied !== undefined && pv.model !== pv.modelApplied) modelFallbacks++;
+      if (t.status === "draft") flagged += termFlags(t, byLetter[t.letterId]).length;
+    }
+    for (const l of letters) if (l.status === "needs_review") flagged += letterFlags(l, terms).length;
+    const failed = letters.filter((l) => l.status === "failed").length;
+    const pinned = config?.model?.pinned;
+    const runs = (testRuns || []).filter((r) => r.model === pinned && r.promptVersion === PROMPT_VERSIONS.extract && r.status === "complete").sort((a, b) => (a.at < b.at ? 1 : -1));
+    const accuracy = runs[0] ? runs[0].accuracy : null;
+    return { failed, flagged, unclear, accuracy, modelFallbacks, lastRun: runs[0] || null };
+  }
+  /* Alerts fire when a count goes up, or accuracy goes down, from the last acknowledged baseline. */
+  function alertsFrom(m, baseline) {
+    if (!baseline) return [];
+    const a = [];
+    if (m.failed > (baseline.failed ?? 0)) a.push({ key: "failed", message: `Failed extractions rose from ${baseline.failed ?? 0} to ${m.failed}` });
+    if (m.flagged > (baseline.flagged ?? 0)) a.push({ key: "flagged", message: `Flagged items rose from ${baseline.flagged ?? 0} to ${m.flagged}` });
+    if (m.unclear > (baseline.unclear ?? 0)) a.push({ key: "unclear", message: `Unclear fields rose from ${baseline.unclear ?? 0} to ${m.unclear}` });
+    if (m.accuracy != null && baseline.accuracy != null && m.accuracy < baseline.accuracy) a.push({ key: "accuracy", message: `Test-set accuracy fell from ${pct(baseline.accuracy)} to ${pct(m.accuracy)}` });
+    if (m.modelFallbacks > (baseline.modelFallbacks ?? 0)) a.push({ key: "model", message: `Terms extracted by a model other than the pinned one rose from ${baseline.modelFallbacks ?? 0} to ${m.modelFallbacks}` });
+    return a;
+  }
+  const pct = (x) => (x == null ? "—" : (Math.round(x * 1000) / 10).toFixed(1) + "%");
+
+  /* ---- MFN eligibility ----
+     Can LP `elector` claim a term granted to LP `grantee`?
+     returns {status: "eligible"|"not_eligible"|"review", reasons:[...]} */
+  function mfnEligibility(elector, grantee, term, bundle) {
+    const reasons = [];
+    const m = elector.mfn || {};
+    if (!m.hasMfn) return { status: "not_eligible", reasons: ["Has no MFN clause"] };
+    if (grantee && elector.id === grantee.id) return { status: "not_eligible", reasons: ["This is the LP that holds the term"] };
+    if (term.mfnStatus === "excluded") return { status: "not_eligible", reasons: ["Term is marked excluded from MFN: " + (term.mfnReason || "no reason given")] };
+    if (term.mfnStatus !== "electable") return { status: "review", reasons: ["Term's MFN status is not set"] };
+    if ((m.excludedCategories || []).includes(term.category)) return { status: "not_eligible", reasons: [`This LP's MFN excludes the ${term.category} category`] };
+    if ((m.excludedTermIds || []).includes(term.id)) return { status: "not_eligible", reasons: ["This LP's MFN excludes this specific term"] };
+    if (m.basis === "manual") return { status: "review", reasons: ["MFN decided case by case" + (m.note ? ": " + m.note : "")] };
+    if (m.basis === "all") reasons.push("MFN covers all LPs' terms");
+    else {
+      const limit = m.thresholdUsd != null ? m.thresholdUsd : elector.commitmentUsd;
+      const gc = grantee ? grantee.commitmentUsd : null;
+      if (gc == null) return { status: "review", reasons: ["Grantee's commitment is unknown"] };
+      if (gc > limit) return { status: "not_eligible", reasons: [`Holder committed ${usd(gc)}, above this LP's MFN limit of ${usd(limit)}`] };
+      reasons.push(`Holder committed ${usd(gc)}, within this LP's MFN limit of ${usd(limit)}${m.thresholdUsd != null ? " (custom threshold)" : " (its own commitment)"}`);
+    }
+    if (m.note) reasons.push("Note: " + m.note);
+    if (bundle && bundle.allOrNothing) reasons.push(`Must elect the whole "${bundle.name}" bundle, including its conditions`);
+    return { status: "eligible", reasons };
+  }
+  function usd(n) {
+    if (n == null || isNaN(n)) return "—";
+    if (n >= 1e9) return "$" + (n / 1e9).toFixed(n % 1e9 ? 2 : 0) + "B";
+    if (n >= 1e6) return "$" + (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + "M";
+    return "$" + Number(n).toLocaleString("en-US");
+  }
+
+  /* ---- Test set scoring ---- */
+  function tokens(s) { return new Set(normalizeForQuote(s).toLowerCase().replace(/[^a-z0-9% ]/g, " ").split(/\s+/).filter((w) => w.length > 2)); }
+  function quoteOverlap(a, b) {
+    const na = normalizeForQuote(a).toLowerCase(), nb = normalizeForQuote(b).toLowerCase();
+    if (!na || !nb) return 0;
+    if (na.includes(nb) || nb.includes(na)) return 1;
+    const ta = tokens(a), tb = tokens(b); let inter = 0;
+    for (const w of ta) if (tb.has(w)) inter++;
+    return inter / Math.max(1, Math.min(ta.size, tb.size));
+  }
+  /* expected: [{category, quote, mfnStatus, lpStatusBased}]; got: extracted terms. */
+  function scoreCase(expected, got) {
+    const used = new Set(); const rows = [];
+    for (const ex of expected) {
+      let best = -1, bestScore = 0;
+      got.forEach((g, i) => { if (used.has(i)) return; const s = quoteOverlap(ex.quote, g.quote); if (s > bestScore) { bestScore = s; best = i; } });
+      if (best < 0 || bestScore < 0.6) { rows.push({ expected: ex, result: "missed" }); continue; }
+      used.add(best);
+      const g = got[best]; const wrong = [];
+      if (g.category !== ex.category) wrong.push(`category (${g.category} vs ${ex.category})`);
+      if (g.mfnStatus !== ex.mfnStatus) wrong.push(`MFN status (${g.mfnStatus} vs ${ex.mfnStatus})`);
+      if (g.lpStatusBased !== ex.lpStatusBased) wrong.push(`LP-status based (${g.lpStatusBased} vs ${ex.lpStatusBased})`);
+      rows.push({ expected: ex, result: wrong.length ? "wrong" : "correct", wrong, got: g });
+    }
+    const extra = got.filter((_, i) => !used.has(i));
+    return { rows, extra, correct: rows.filter((r) => r.result === "correct").length, total: expected.length };
+  }
+
+  return { ZERO_HASH, PROMPT_VERSIONS, UNCLEAR, canon, sha256Bytes, sha256Text, auditBody, hashAuditEntry, auditId, verifyAuditChain,
+    normalizeForQuote, documentText, quoteCheck, splitParagraphs, unclearFields, isLive, termFlags, coverage, letterFlags,
+    metrics, alertsFrom, pct, mfnEligibility, usd, quoteOverlap, scoreCase, getPath };
+})();
+
+
+/* ===== Runtime: capabilities, shared store, audit log, model calls, extraction pipeline ===== */
+const C = CORE;
+const RT = { db: null, user: null, sample: null, assets: null, downloads: null, meId: null, canWrite: null, tabId: "tab-" + Math.random().toString(36).slice(2, 10) };
+const SEED_ACTOR = "seed";
+
+const store = {
+  state: {
+    ready: {}, config: null, baseline: null, auditHead: null,
+    lps: [], letters: [], terms: [], bundles: [], originals: [], elections: [], tests: [], testRuns: [], audit: [],
+    names: { [SEED_ACTOR]: "Sample data" }, caps: { db: "loading", sample: "loading", assets: "loading", downloads: "loading", user: "loading" },
+    integrity: {}, chain: null, toast: null, busy: null, slowNote: false, readOnly: false, testRun: null,
+  },
+  listeners: new Set(),
+  set(patch) { this.state = { ...this.state, ...(typeof patch === "function" ? patch(this.state) : patch) }; this.listeners.forEach((l) => l()); },
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function rid(prefix) {
+  const a = new Uint8Array(6); crypto.getRandomValues(a);
+  return prefix + "-" + Date.now().toString(36) + "-" + Array.from(a).map((b) => (b % 36).toString(36)).join("");
+}
+function toast(kind, text) {
+  store.set({ toast: { kind, text, at: Date.now() } });
+  const at = store.state.toast.at; setTimeout(() => { if (store.state.toast?.at === at) store.set({ toast: null }); }, kind === "bad" ? 9000 : 4500);
+}
+function errText(e) {
+  if (!e) return "Something went wrong";
+  const code = e.code || "";
+  const map = {
+    not_granted: "Claude access was not allowed for this page. You can still enter terms by hand.",
+    rate_limited: "Too many requests to Claude right now. Wait a minute and try again.",
+    session_expired: "Your session expired. Sign in again, then retry.",
+    sampling_disabled: "Claude is not available for this account.",
+    prompt_too_large: "The document is too long to send in one request. Split it into shorter parts.",
+    invalid_json: "Claude's reply could not be read as data. Try again.",
+    refused: "Claude declined this request. Try different wording.",
+    quota_exceeded: "The shared database is full. Delete old records before adding more.",
+    invalid_argument: "The database refused this write. You may only have view access.",
+  };
+  return map[code] || e.message || String(e);
+}
+
+/* ---------- names ---------- */
+const pendingNames = new Set(); let nameTimer = null;
+function wantNames(ids) {
+  const known = store.state.names;
+  for (const id of ids) if (id && !(id in known) && id !== SEED_ACTOR) pendingNames.add(id);
+  if (pendingNames.size && !nameTimer) nameTimer = setTimeout(async () => {
+    nameTimer = null; const ids = [...pendingNames].slice(0, 64); ids.forEach((i) => pendingNames.delete(i));
+    if (!RT.user) return;
+    try {
+      const ps = await RT.user.profiles(ids); const add = {};
+      for (const id of ids) add[id] = (ps && ps[id] && ps[id].name) || "";
+      store.set((s) => ({ names: { ...s.names, ...add } }));
+    } catch { /* names stay blank */ }
+  }, 50);
+}
+function nameOf(id) {
+  if (!id) return "Unknown";
+  if (id === SEED_ACTOR) return "Sample data";
+  const n = store.state.names[id];
+  if (n === undefined) { wantNames([id]); return "…"; }
+  return (id === RT.meId ? (n || "You") + " (you)" : n || "Someone");
+}
+
+/* ---------- boot ---------- */
+const COLLECTIONS = ["lps", "letters", "terms", "bundles", "originals", "elections", "tests", "testRuns", "audit"];
+async function boot() {
+  const use = (n) => (window.claude && window.claude.use ? window.claude.use(n).catch(() => null) : Promise.resolve(null));
+  const slow = setTimeout(() => store.set({ slowNote: true }), 10000);
+  const [db, user, sample, assets, downloads] = await Promise.all([use("db"), use("user"), use("sample"), use("assets"), use("downloads")]);
+  RT.db = db; RT.user = user; RT.sample = sample; RT.assets = assets; RT.downloads = downloads;
+  store.set({ caps: { db: db ? "on" : "off", user: user ? "on" : "off", sample: sample ? "on" : "off", assets: assets ? "on" : "off", downloads: downloads ? "on" : "off" } });
+  if (user) {
+    try { const me = await user.me(); RT.meId = me.id; store.set((s) => ({ names: { ...s.names, ...(me.id ? { [me.id]: me.name || "" } : {}) } })); } catch {}
+    try { RT.canWrite = await user.can("data.write"); } catch { RT.canWrite = null; }
+    if (RT.canWrite === false) store.set({ readOnly: true });
+  }
+  if (!db) { clearTimeout(slow); store.set({ slowNote: true }); return; }
+  const onErr = (what) => (e) => { if (e.code !== "unavailable") toast("bad", `Could not load ${what}: ${errText(e)}`); };
+  const mark = (k) => { store.set((s) => ({ ready: { ...s.ready, [k]: true } })); if (["config", "lps", "letters", "terms"].every((x) => store.state.ready[x])) { clearTimeout(slow); store.set({ slowNote: false }); } };
+  for (const col of COLLECTIONS) {
+    db.collection(col).onSnapshot((snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      store.set({ [col]: list }); if (!snap.metadata.fromCache) mark(col);
+      if (col === "audit") scheduleChainCheck();
+    }, onErr(col));
+  }
+  db.doc("config/main").onSnapshot((d) => { store.set({ config: d.exists ? d.data() : null }); if (!d.metadata.fromCache) mark("config"); }, onErr("settings"));
+  db.doc("monitor/baseline").onSnapshot((d) => store.set({ baseline: d.exists ? d.data() : null }), onErr("alert baseline"));
+  db.doc("meta/auditHead").onSnapshot((d) => { store.set({ auditHead: d.exists ? d.data() : { seq: 0, hash: C.ZERO_HASH } }); scheduleChainCheck(); }, onErr("audit head"));
+}
+
+/* ---------- audit log (append-only by convention, hash-chained so edits and deletions are detectable) ---------- */
+let auditQueue = Promise.resolve();
+function appendAudit(action, entityType, entityId, summary, data) {
+  const run = async () => {
+    const head = RT.db.doc("meta/auditHead");
+    let got = false;
+    for (let i = 0; i < 40 && !got; i++) {
+      const r = await head.acquire({ holder: RT.tabId, ttlMs: 4000 });
+      if (r.acquired) got = true; else await sleep(150 + Math.random() * 350);
+    }
+    if (!got) throw new Error("The audit log is busy with another change. Your change was saved; try the action again to log it.");
+    const snap = await head.get();
+    const h = snap.exists ? snap.data() : { seq: 0, hash: C.ZERO_HASH };
+    const e = { seq: (h.seq || 0) + 1, ts: new Date().toISOString(), actor: RT.meId || "unknown", action, entityType, entityId, summary, data: data == null ? null : JSON.parse(JSON.stringify(data)), prevHash: h.hash || C.ZERO_HASH };
+    e.hash = await C.hashAuditEntry(e);
+    await RT.db.doc("audit/" + C.auditId(e.seq)).set(e);
+    await head.set({ seq: e.seq, hash: e.hash });
+  };
+  const p = auditQueue.then(run, run); auditQueue = p.catch(() => {}); return p;
+}
+let chainTimer = null;
+function scheduleChainCheck() {
+  clearTimeout(chainTimer);
+  chainTimer = setTimeout(async () => {
+    const s = store.state; if (!s.auditHead) return;
+    const res = await C.verifyAuditChain(s.audit, s.auditHead);
+    store.set({ chain: { ...res, at: new Date().toISOString() } });
+  }, 400);
+}
+
+/* Manual re-check: re-reads every entry from the database instead of trusting the copy on screen. */
+async function recheckChainFresh() {
+  if (!RT.db) return;
+  try {
+    const [snap, head] = await Promise.all([RT.db.collection("audit").get(), RT.db.doc("meta/auditHead").get()]);
+    const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const h = head.exists ? head.data() : { seq: 0, hash: C.ZERO_HASH };
+    const res = await C.verifyAuditChain(entries, h);
+    store.set({ audit: entries, auditHead: h, chain: { ...res, at: new Date().toISOString() } });
+    toast(res.ok ? "ok" : "bad", res.ok ? `Audit log re-read: ${res.checked} entries, chain intact.` : `Audit log re-read: ${res.problems.length} problem${res.problems.length === 1 ? "" : "s"} found.`);
+  } catch (e) { toast("bad", errText(e)); }
+}
+
+/* One user action = data writes, then one audit entry. */
+async function act(label, fn) {
+  if (!RT.db) { toast("bad", "The shared database is not available in this view."); return null; }
+  if (store.state.readOnly) { toast("bad", "You have view-only access, so changes are turned off."); return null; }
+  store.set({ busy: label });
+  try { const r = await fn(); return r ?? true; }
+  catch (e) { console.error(e); toast("bad", errText(e)); if (e && e.code === "invalid_argument") store.set({ readOnly: true }); return null; }
+  finally { store.set({ busy: null }); }
+}
+const put = (path, data) => RT.db.doc(path).set(JSON.parse(JSON.stringify(data)));
+const patch = (path, data) => RT.db.doc(path).update(JSON.parse(JSON.stringify(data)));
+
+/* ---------- originals: stored once, verified by SHA-256 every time they are opened ---------- */
+function bytesToB64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToBytes(b64) { const s = atob(b64.trim()); const out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; }
+
+async function storeOriginal({ kind, file, bytes, text, letterId }) {
+  const origId = "orig-" + letterId.slice(3);
+  let doc, sha;
+  if (kind === "paste") {
+    sha = await C.sha256Text(text);
+    doc = { letterId, filename: "Pasted text.txt", mime: "text/plain", storage: "inline-text", text, sha256: sha, sizeBytes: new TextEncoder().encode(text).length };
+  } else {
+    sha = await C.sha256Bytes(bytes);
+    const isPdf = kind === "pdf";
+    let stored = null;
+    if (RT.assets) {
+      try {
+        const blob = isPdf ? new Blob([bytes], { type: "application/pdf" }) : new Blob([bytesToB64(bytes)], { type: "text/plain" });
+        const up = await RT.assets.upload(blob, { type: isPdf ? "application/pdf" : "text/plain" });
+        stored = { storage: isPdf ? "asset" : "asset-b64", assetId: up.id };
+      } catch (e) { console.warn("asset upload failed", e); }
+    }
+    if (!stored) {
+      const b64 = bytesToB64(bytes);
+      if (b64.length > 230000) throw new Error("This file is too large to store without upload access (Editor). Ask the artifact owner for Editor access, or paste the text instead.");
+      stored = { storage: "inline-b64", b64 };
+    }
+    doc = { letterId, filename: file.name, mime: file.type || (isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), ...stored, sha256: sha, sizeBytes: bytes.length };
+  }
+  doc.createdAt = new Date().toISOString(); doc.createdBy = RT.meId || "unknown";
+  await put("originals/" + origId, doc);
+  await appendAudit("original.stored", "original", origId, `Stored original "${doc.filename}" (${doc.sizeBytes.toLocaleString()} bytes, read-only)`, { sha256: sha, letterId, storage: doc.storage });
+  return { origId, sha, doc };
+}
+
+async function originalBytes(o) {
+  if (o.storage === "inline-text") return new TextEncoder().encode(o.text || "");
+  if (o.storage === "inline-b64") return b64ToBytes(o.b64 || "");
+  const res = await fetch("/_blob/" + o.assetId);
+  if (!res.ok) throw new Error("The stored file could not be fetched (" + res.status + ")");
+  if (o.storage === "asset-b64") return b64ToBytes(await res.text());
+  return new Uint8Array(await res.arrayBuffer());
+}
+/* Compares the file's hash now with (a) the hash saved with it and (b) the hash written to the audit log when it was stored. */
+async function verifyOriginal(o) {
+  const out = { at: new Date().toISOString(), stored: o.sha256, logged: null, computed: null, status: "checking" };
+  store.set((s) => ({ integrity: { ...s.integrity, [o.id]: out } }));
+  try {
+    const bytes = await originalBytes(o);
+    out.computed = await C.sha256Bytes(bytes);
+    const entry = store.state.audit.find((e) => e.action === "original.stored" && e.entityId === o.id);
+    out.logged = entry?.data?.sha256 || null;
+    const chainOk = store.state.chain ? store.state.chain.bySeq?.[entry?.seq] !== "broken" : true;
+    if (out.computed !== o.sha256) { out.status = "mismatch"; out.message = "The file's contents no longer match the hash saved when it was stored."; }
+    else if (!out.logged) { out.status = "mismatch"; out.message = "No audit log entry records this file being stored."; }
+    else if (out.logged !== out.computed) { out.status = "mismatch"; out.message = "The hash in the audit log differs from the file's current hash."; }
+    else if (!chainOk) { out.status = "mismatch"; out.message = "The audit log entry for this file fails the chain check."; }
+    else { out.status = "ok"; out.message = "Matches the hash saved with it and the hash in the audit log."; }
+  } catch (e) { out.status = "error"; out.message = errText(e); }
+  store.set((s) => ({ integrity: { ...s.integrity, [o.id]: { ...out } } }));
+  return out;
+}
+
+/* ---------- reading files ---------- */
+const LIB = {
+  mammoth: "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js",
+  pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
+  pdf: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+};
+const loaded = {};
+function loadScript(url) {
+  if (!loaded[url]) loaded[url] = new Promise((res, rej) => { const s = document.createElement("script"); s.src = url; s.onload = res; s.onerror = () => rej(new Error("Could not load a file reader library. Check your connection and retry.")); document.head.appendChild(s); });
+  return loaded[url];
+}
+async function docxToText(bytes) {
+  await loadScript(LIB.mammoth);
+  const r = await window.mammoth.extractRawText({ arrayBuffer: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
+  return r.value;
+}
+async function pdfToText(bytes) {
+  await loadScript(LIB.pdfWorker); await loadScript(LIB.pdf); // worker script runs on the main thread (no cross-origin worker needed)
+  const lib = window.pdfjsLib; lib.GlobalWorkerOptions.workerSrc = LIB.pdfWorker;
+  const pdf = await lib.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+  const out = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p); const tc = await page.getTextContent();
+    const lines = []; let cur = null;
+    for (const it of tc.items) {
+      if (!("str" in it)) continue;
+      const y = it.transform[5], hgt = Math.abs(it.transform[3]) || it.height || 10;
+      if (!cur || Math.abs(cur.y - y) > hgt * 0.5) { cur = { y, h: hgt, text: "" }; lines.push(cur); }
+      cur.text += (cur.text && !cur.text.endsWith(" ") && !it.str.startsWith(" ") ? " " : "") + it.str;
+    }
+    const gaps = []; for (let i = 1; i < lines.length; i++) gaps.push(Math.abs(lines[i - 1].y - lines[i].y));
+    const med = gaps.length ? [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)] : 0;
+    let text = "";
+    lines.forEach((l, i) => { if (i > 0) text += gaps[i - 1] > med * 1.4 ? "\n\n" : "\n"; text += l.text.trim(); });
+    out.push(text);
+  }
+  return out.join("\n\n");
+}
+
+/* ---------- model calls: every call names the pinned model, and records which model answered ---------- */
+function parseJson(text) {
+  let t = String(text || "").trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (fence) t = fence[1].trim();
+  try { return JSON.parse(t); } catch {}
+  const s = t.search(/[\[{]/), e = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
+  if (s >= 0 && e > s) { try { return JSON.parse(t.slice(s, e + 1)); } catch {} }
+  const err = new Error("Claude's reply could not be read as data. Try again."); err.code = "invalid_json"; throw err;
+}
+async function callModel(prompt, { model, signal } = {}) {
+  if (!RT.sample) { const e = new Error("Claude is not available in this view, so extraction and plain-English search are off. You can still enter terms by hand and use the filters."); e.code = "no_sample"; throw e; }
+  const pinned = model || store.state.config?.model?.pinned;
+  if (!pinned) throw new Error("No pinned model is set. Set one under Quality.");
+  const res = await RT.sample(prompt, { model: pinned, modelTier: "default", cache: false, signal });
+  if (res.truncated) { const e = new Error("Claude's answer was cut short. Try a shorter document."); e.code = "truncated"; throw e; }
+  return { json: parseJson(res.text), model: pinned, modelApplied: res.modelApplied ?? null };
+}
+
+function categoryList() { return store.state.config?.categories || []; }
+function catName(id) { if (id === C.UNCLEAR) return "Unclear"; return categoryList().find((c) => c.id === id)?.name || id; }
+const LP_TYPES = { public_pension: "Public pension", sovereign: "Sovereign wealth fund", erisa: "Corporate (ERISA) plan", insurance: "Insurance company", endowment: "Endowment", foundation: "Foundation", fund_of_funds: "Fund of funds", family_office: "Family office", other: "Other" };
+
+function extractionPrompt(paragraphs, ctx) {
+  const cats = categoryList().map((c) => `${c.id} = ${c.name}`).join("; ");
+  const fund = store.state.config?.fund || {};
+  return `You extract obligations from one side letter of a private infrastructure fund (${fund.name || "the Fund"}) for a side-letter tracking system used by the fund's team and outside counsel. A wrong answer is worse than "unclear": never guess.
+
+Investor (LP): ${ctx.lpName} (${LP_TYPES[ctx.lpType] || ctx.lpType}). Vehicle: ${ctx.vehicle}. Standard management fee under the Partnership Agreement: ${fund.standardFeePct ?? 1.5}% per year. MFN clause: ${fund.mfnSection || "Section 14.9"}.
+Category ids: ${cats}; use "unclear" only if no category fits.
+
+Side letter, numbered paragraphs:
+${paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n")}
+
+Reply with only one JSON object, no prose:
+{"terms":[{"category":"<category id>","summary":"one plain-English sentence","quote":"text copied character-for-character from the letter","paragraphs":[<paragraph numbers this term relies on>],"vehicle":"<vehicle the term applies to>","conditions":"conditions the benefit depends on, or None","expiry":"end date or trigger, or None","lpStatusBased":"yes|no|unclear","mfnStatus":"electable|excluded|unclear","mfnReason":"short reason","obligation":{"is":"yes|no|unclear","deadline":"frequency or deadline if yes, else empty"},"feeRatePct":<number or null>,"carryPct":<number or null>,"bundleKey":"<key shared by terms granted together, or null>"}],
+"noObligationParagraphs":[<paragraph numbers with no right or obligation, e.g. recitals, governing law>],
+"bundles":[{"key":"<bundleKey>","name":"short name","allOrNothing":true,"reason":"why these go together"}]}
+
+Rules:
+1. Every paragraph number from 1 to ${paragraphs.length} must appear in some term's "paragraphs" or in "noObligationParagraphs". A paragraph can support several terms.
+2. "quote" must be an exact, contiguous copy of the letter's words (at least 15 characters, ideally one sentence). Do not paraphrase or fix typos.
+3. Any field you cannot determine from the text is the string "unclear". Do not guess.
+4. lpStatusBased is "yes" when the term exists because of what the investor legally is (public pension public-records laws, sovereign immunity, ERISA plan assets, insurance regulation, fund-of-funds look-through, state investment policies).
+5. mfnStatus: "excluded" for LP-status terms, for the MFN right itself, and for anything the letter says may not be elected; otherwise "electable" if another LP could claim it through an MFN clause. Always give mfnReason.
+6. feeRatePct: the investor's resulting annual management fee rate in percent when the term sets or changes it (a 0.10% reduction from ${fund.standardFeePct ?? 1.5}% is ${((fund.standardFeePct ?? 1.5) - 0.1).toFixed(2)}); otherwise null. carryPct likewise for carried interest.
+7. Use bundleKey when the letter grants terms together, or ties a benefit to a condition or obligation in another paragraph that an electing LP would also have to accept. Set allOrNothing true when they cannot be elected separately.
+8. vehicle is "${ctx.vehicle}" unless the clause limits the term to a different vehicle.`;
+}
+
+function normalizeTerm(raw, paragraphs, ctx) {
+  const lc = (v) => String(v ?? "").trim().toLowerCase();
+  const pick = (v, opts) => (opts.includes(lc(v)) ? lc(v) : C.UNCLEAR);
+  const str = (v) => { const s = String(v ?? "").trim(); return s ? (lc(s) === C.UNCLEAR ? C.UNCLEAR : s) : C.UNCLEAR; };
+  const optStr = (v) => { const s = String(v ?? "").trim(); if (!s || /^(none|n\/a|null)$/i.test(s)) return "None"; return lc(s) === C.UNCLEAR ? C.UNCLEAR : s; };
+  const catIds = categoryList().map((c) => c.id);
+  const n = paragraphs.length;
+  let paras = Array.isArray(raw.paragraphs) ? raw.paragraphs.map(Number).filter((x) => Number.isInteger(x) && x >= 1 && x <= n) : [];
+  if (!paras.length) { const qc = C.quoteCheck(raw.quote, paragraphs); if (qc.paragraphs) paras = qc.paragraphs; }
+  const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  const ob = raw.obligation || {};
+  return {
+    category: catIds.includes(lc(raw.category)) ? lc(raw.category) : C.UNCLEAR,
+    summary: str(raw.summary), quote: String(raw.quote ?? "").trim(), paragraphs: [...new Set(paras)].sort((a, b) => a - b),
+    vehicle: raw.vehicle ? str(raw.vehicle) : ctx.vehicle, conditions: optStr(raw.conditions), expiry: optStr(raw.expiry),
+    lpStatusBased: pick(raw.lpStatusBased, ["yes", "no"]), mfnStatus: pick(raw.mfnStatus, ["electable", "excluded"]), mfnReason: String(raw.mfnReason ?? "").trim(),
+    obligation: { is: pick(ob.is, ["yes", "no"]), deadline: String(ob.deadline ?? "").trim() || (lc(ob.is) === "yes" ? C.UNCLEAR : "") },
+    feeRatePct: num(raw.feeRatePct), carryPct: num(raw.carryPct), bundleKey: raw.bundleKey ? String(raw.bundleKey) : null,
+  };
+}
+
+async function extractTerms(paragraphs, ctx, { model, signal } = {}) {
+  const r = await callModel(extractionPrompt(paragraphs, ctx), { model, signal });
+  const j = r.json || {};
+  const terms = (Array.isArray(j.terms) ? j.terms : []).map((t) => normalizeTerm(t, paragraphs, ctx));
+  const n = paragraphs.length;
+  const noObligation = (Array.isArray(j.noObligationParagraphs) ? j.noObligationParagraphs : []).map(Number).filter((x) => Number.isInteger(x) && x >= 1 && x <= n);
+  const bundles = (Array.isArray(j.bundles) ? j.bundles : []).filter((b) => b && b.key).map((b) => ({ key: String(b.key), name: String(b.name || "Bundle"), allOrNothing: b.allOrNothing !== false, reason: String(b.reason || "") }));
+  return { terms, noObligation: [...new Set(noObligation)], bundles, model: r.model, modelApplied: r.modelApplied };
+}
+
+async function secondPassCheck(paragraphs, terms, ctx, { model, signal } = {}) {
+  const prompt = `You are a second, independent reviewer checking another reviewer's extraction of a private infrastructure fund side letter for ${ctx.lpName}. Report only real problems; if the extraction is right, return an empty list.
+
+Side letter, numbered paragraphs:
+${paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n")}
+
+Extracted terms (index: fields):
+${terms.map((t, i) => `${i}: ${JSON.stringify({ category: t.category, summary: t.summary, quote: t.quote, paragraphs: t.paragraphs, conditions: t.conditions, expiry: t.expiry, lpStatusBased: t.lpStatusBased, mfnStatus: t.mfnStatus, obligation: t.obligation, feeRatePct: t.feeRatePct })}`).join("\n")}
+
+Look for: rights or obligations in the letter that no term captures; wrong category; conditions, expiry dates or triggers that were missed; wrong MFN status or LP-status flag; wrong fee rate; misread deadlines.
+
+Reply with only JSON: {"issues":[{"paragraph":<number or null>,"termIndex":<index or null>,"field":"<field name or null>","severity":"high|medium|low","problem":"one sentence"}]}`;
+  const r = await callModel(prompt, { model, signal });
+  const issues = (Array.isArray(r.json?.issues) ? r.json.issues : []).map((x) => ({
+    paragraph: Number.isInteger(Number(x.paragraph)) ? Number(x.paragraph) : null, termIndex: Number.isInteger(Number(x.termIndex)) && x.termIndex !== null ? Number(x.termIndex) : null,
+    field: x.field ? String(x.field) : null, severity: ["high", "medium", "low"].includes(x.severity) ? x.severity : "medium", problem: String(x.problem || "").trim(),
+  })).filter((x) => x.problem);
+  return { issues, model: r.model, modelApplied: r.modelApplied };
+}
+
+/* Full pipeline for a stored letter: extract -> quote + coverage checks -> second pass -> ready for review. */
+async function runExtraction(letterId, { onStep, signal } = {}) {
+  const s = store.state; const letter = s.letters.find((l) => l.id === letterId); const lp = s.lps.find((l) => l.id === letter.lpId);
+  const ctx = { lpName: lp?.name || "the Investor", lpType: lp?.type || "other", vehicle: letter.vehicle };
+  const step = (k, st, text) => onStep && onStep(k, st, text);
+  const pinned = s.config.model.pinned;
+  await patch("letters/" + letterId, { status: "extracting", extraction: { model: pinned, promptVersion: C.PROMPT_VERSIONS.extract, startedAt: new Date().toISOString(), by: RT.meId } });
+  let ex;
+  try {
+    step("extract", "run", `Reading the letter with ${pinned}…`);
+    ex = await extractTerms(letter.paragraphs, ctx, { signal });
+  } catch (e) {
+    const msg = errText(e);
+    await patch("letters/" + letterId, { status: "failed", extraction: { model: pinned, promptVersion: C.PROMPT_VERSIONS.extract, at: new Date().toISOString(), by: RT.meId, error: msg } });
+    await appendAudit("extraction.failed", "letter", letterId, `Extraction failed for ${ctx.lpName}: ${msg}`, { model: pinned, promptVersion: C.PROMPT_VERSIONS.extract, error: msg });
+    step("extract", "bad", msg); throw e;
+  }
+  const at = new Date().toISOString();
+  const fallback = ex.modelApplied !== pinned;
+  step("extract", fallback ? "warn" : "ok", `${ex.terms.length} terms found${fallback ? ` · answered by ${ex.modelApplied || "an unconfirmed model"}, not ${pinned}` : ` by ${pinned}`}`);
+  // bundles
+  const bundleIdByKey = {};
+  for (const b of ex.bundles) {
+    const members = ex.terms.filter((t) => t.bundleKey === b.key); if (members.length < 2) continue;
+    bundleIdByKey[b.key] = rid("bnd");
+  }
+  const termIds = ex.terms.map(() => rid("t"));
+  const prov = { model: pinned, modelApplied: ex.modelApplied, promptVersion: C.PROMPT_VERSIONS.extract, extractedAt: at, extractedBy: RT.meId, approvedBy: null, approvedAt: null };
+  for (let i = 0; i < ex.terms.length; i++) {
+    const t = ex.terms[i]; const { bundleKey, ...rest } = t;
+    await put("terms/" + termIds[i], { ...rest, letterId, lpId: letter.lpId, bundleId: bundleIdByKey[bundleKey] || null, status: "draft", origin: "extracted", provenance: prov });
+  }
+  for (const b of ex.bundles) {
+    const id = bundleIdByKey[b.key]; if (!id) continue;
+    await put("bundles/" + id, { name: b.name, lpId: letter.lpId, termIds: ex.terms.map((t, i) => (t.bundleKey === b.key ? termIds[i] : null)).filter(Boolean), allOrNothing: b.allOrNothing, note: b.reason, createdBy: RT.meId, createdAt: at });
+  }
+  const quoteFails = ex.terms.filter((t) => C.quoteCheck(t.quote, letter.paragraphs).status !== "pass").length;
+  const fakeLetter = { ...letter, noObligation: ex.noObligation };
+  const cov = C.coverage(fakeLetter, ex.terms.map((t, i) => ({ ...t, id: termIds[i], letterId, status: "draft" })));
+  step("quote", quoteFails ? "warn" : "ok", quoteFails ? `${quoteFails} of ${ex.terms.length} quotes not found word-for-word (flagged)` : `All ${ex.terms.length} quotes found word-for-word`);
+  step("coverage", cov.unaccounted.length ? "warn" : "ok", cov.unaccounted.length ? `${cov.unaccounted.length === 1 ? "Paragraph" : "Paragraphs"} ${cov.unaccounted.join(", ")} not linked to any term (flagged)` : `All ${letter.paragraphs.length} paragraphs accounted for`);
+  await patch("letters/" + letterId, { status: "needs_review", noObligation: ex.noObligation, extraction: { model: pinned, modelApplied: ex.modelApplied, promptVersion: C.PROMPT_VERSIONS.extract, at, by: RT.meId } });
+  await appendAudit("extraction.completed", "letter", letterId, `Extracted ${ex.terms.length} draft terms for ${ctx.lpName}; ${quoteFails} quote failures, ${cov.unaccounted.length} unaccounted paragraphs`,
+    { model: pinned, modelApplied: ex.modelApplied, promptVersion: C.PROMPT_VERSIONS.extract, termIds, bundles: Object.values(bundleIdByKey), quoteFails, unaccounted: cov.unaccounted });
+  // second pass
+  try {
+    step("second", "run", "Second pass: rereading the letter against the extracted terms…");
+    const sp = await secondPassCheck(letter.paragraphs, ex.terms, ctx, { signal });
+    const issues = sp.issues.map((x) => ({ id: rid("iss"), paragraph: x.paragraph, termId: x.termIndex != null && termIds[x.termIndex] ? termIds[x.termIndex] : null, field: x.field, severity: x.severity, problem: x.problem, resolved: false }));
+    await patch("letters/" + letterId, { secondPass: { at: new Date().toISOString(), model: pinned, modelApplied: sp.modelApplied, promptVersion: C.PROMPT_VERSIONS.verify, issues } });
+    await appendAudit("secondpass.completed", "letter", letterId, `Second-pass check found ${issues.length} disagreement${issues.length === 1 ? "" : "s"}`, { model: pinned, modelApplied: sp.modelApplied, promptVersion: C.PROMPT_VERSIONS.verify, issues: issues.map((i) => ({ id: i.id, paragraph: i.paragraph, termId: i.termId, problem: i.problem })) });
+    step("second", issues.length ? "warn" : "ok", issues.length ? `${issues.length} disagreement${issues.length === 1 ? "" : "s"} to review` : "No disagreements found");
+  } catch (e) {
+    const msg = errText(e);
+    const issues = [{ id: rid("iss"), paragraph: null, termId: null, field: null, severity: "high", problem: "The second-pass check could not run (" + msg + "). Review this letter line by line.", resolved: false }];
+    await patch("letters/" + letterId, { secondPass: { at: new Date().toISOString(), model: pinned, modelApplied: null, promptVersion: C.PROMPT_VERSIONS.verify, issues, error: msg } });
+    await appendAudit("secondpass.failed", "letter", letterId, "Second-pass check failed: " + msg, { error: msg });
+    step("second", "bad", "Second pass failed: " + msg + " (flagged for line-by-line review)");
+  }
+  return { termIds };
+}
+
+/* ===== UI part 1: shared pieces, search, letters, intake ===== */
+const { html, render, useState, useEffect, useMemo, useRef } = htmPreact;
+
+function useStore() {
+  const [, force] = useState(0);
+  useEffect(() => { const l = () => force((x) => x + 1); store.listeners.add(l); return () => store.listeners.delete(l); }, []);
+  return store.state;
+}
+const go = (h) => { location.hash = h; window.scrollTo(0, 0); };
+const fmtDate = (iso) => { if (!iso) return "—"; const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso); return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }); };
+const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
+const short = (h) => (h ? h.slice(0, 10) + "…" + h.slice(-6) : "—");
+const lpName = (id) => store.state.lps.find((l) => l.id === id)?.name || "Unknown LP";
+const pctFee = (x) => (x == null ? null : `${Number(x).toFixed(2)}%`);
+const bp = (x) => (x == null ? "" : `${Math.round(Number(x) * 100)} bp`);
+
+function Pill({ kind = "neutral", children, title }) { return html`<span class=${"pill pill-" + kind} title=${title || ""}>${children}</span>`; }
+function StatusPill({ status }) {
+  const m = { approved: ["ok", "Approved"], draft: ["warn", "Draft"], needs_review: ["warn", "Needs review"], extracting: ["info", "Extracting"], failed: ["bad", "Extraction failed"], rejected: ["neutral", "Rejected"], superseded: ["neutral", "Superseded"], pending: ["info", "Pending"] };
+  const [k, t] = m[status] || ["neutral", status]; return html`<${Pill} kind=${k}>${t}<//>`;
+}
+function MfnPill({ v }) { return v === "electable" ? html`<${Pill} kind="info">MFN electable<//>` : v === "excluded" ? html`<${Pill} kind="neutral">MFN excluded<//>` : html`<${Pill} kind="warn">MFN unclear<//>`; }
+function Clause({ text, n }) { return html`<blockquote class="clause">${n ? html`<span class="pmark">¶ ${Array.isArray(n) ? n.join(", ") : n}</span>` : null}${text}</blockquote>`; }
+function Empty({ title, children }) { return html`<div class="empty"><strong>${title}</strong>${children ? html`<div>${children}</div>` : null}</div>`; }
+function Field({ label, hint, children, wide }) { return html`<label class=${"field" + (wide ? " wide" : "")}><span class="flabel">${label}</span>${children}${hint ? html`<span class="fhint">${hint}</span>` : null}</label>`; }
+function Seg({ value, options, onChange, disabled }) {
+  return html`<div class="seg" role="group">${options.map(([v, l]) => html`<button type="button" class=${value === v ? "on" : ""} disabled=${disabled} onClick=${() => onChange(v)}>${l}</button>`)}</div>`;
+}
+function Toggles({ values, options, onChange }) {
+  const set = new Set(values || []);
+  return html`<div class="toggles">${options.map(([v, l]) => html`<button type="button" class=${set.has(v) ? "on" : ""} onClick=${() => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); onChange([...n]); }}>${l}</button>`)}</div>`;
+}
+function Highlight({ text, words }) {
+  if (!words || !words.length) return text;
+  const esc = words.filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).sort((a, b) => b.length - a.length);
+  if (!esc.length) return text;
+  const re = new RegExp("(" + esc.join("|") + ")", "gi");
+  return String(text).split(re).map((part, i) => (i % 2 ? html`<mark>${part}</mark>` : part));
+}
+function Provenance({ t }) {
+  const p = t.provenance || {};
+  const fallback = p.model && p.modelApplied !== undefined && p.model !== p.modelApplied;
+  return html`<div class="prov">
+    <span>Extracted by <code>${p.modelApplied === null ? "unconfirmed model" : p.modelApplied || "—"}</code>${fallback ? html` <${Pill} kind="bad">pinned: ${p.model}<//>` : null}</span>
+    <span>Prompt <code>${p.promptVersion || "—"}</code></span>
+    <span>${fmtTime(p.extractedAt)} by ${nameOf(p.extractedBy)}</span>
+    <span>${p.approvedBy ? html`Approved by ${nameOf(p.approvedBy)}, ${fmtTime(p.approvedAt)}` : "Not approved"}</span>
+  </div>`;
+}
+
+/* A compact, read-only term card (search results, letter detail, MFN) */
+function TermCard({ t, words, showLp = true, extra }) {
+  const s = store.state;
+  const bundle = t.bundleId ? s.bundles.find((b) => b.id === t.bundleId) : null;
+  const siblings = bundle ? s.terms.filter((x) => bundle.termIds.includes(x.id) && x.id !== t.id) : [];
+  return html`<article class="term">
+    <header class="term-h">
+      ${showLp ? html`<a class="lp" href=${"#letter-" + t.letterId}>${lpName(t.lpId)}</a>` : null}
+      <${Pill} kind="cat">${catName(t.category)}<//>
+      <${MfnPill} v=${t.mfnStatus} />
+      ${t.lpStatusBased === "yes" ? html`<${Pill} kind="neutral">LP-status based<//>` : null}
+      ${t.status !== "approved" ? html`<${StatusPill} status=${t.status} />` : null}
+      ${t.feeRatePct != null ? html`<span class="num">${pctFee(t.feeRatePct)} <span class="muted">(${bp(t.feeRatePct)})</span></span>` : null}
+    </header>
+    <p class="summary"><${Highlight} text=${t.summary} words=${words} /></p>
+    <${Clause} text=${html`<${Highlight} text=${t.quote} words=${words} />`} n=${t.paragraphs} />
+    <dl class="facts">
+      <div><dt>Vehicle</dt><dd>${t.vehicle}</dd></div>
+      <div><dt>Conditions</dt><dd>${t.conditions}</dd></div>
+      <div><dt>Expiry / trigger</dt><dd>${t.expiry}</dd></div>
+      <div><dt>Ongoing obligation</dt><dd>${t.obligation?.is === "yes" ? t.obligation.deadline || "Yes" : t.obligation?.is === "no" ? "No" : "Unclear"}</dd></div>
+      <div><dt>MFN reason</dt><dd>${t.mfnReason || "—"}</dd></div>
+    </dl>
+    ${bundle ? html`<div class="bundle-box">
+      <div><strong>Bundle: ${bundle.name}</strong> ${bundle.allOrNothing ? html`<${Pill} kind="warn">all-or-nothing<//>` : html`<${Pill} kind="neutral">can be elected separately<//>`}</div>
+      ${bundle.note ? html`<p class="muted">${bundle.note}</p>` : null}
+      <ul>${siblings.map((x) => html`<li><${Pill} kind="cat">${catName(x.category)}<//> ${x.summary}</li>`)}</ul>
+    </div>` : null}
+    ${extra || null}
+  </article>`;
+}
+
+/* ---------------- Search ---------------- */
+const emptyFilter = () => ({ categories: [], lpIds: [], lpTypes: [], vehicles: [], mfnStatus: [], lpStatusBased: [], obligation: [], feeBelow: null, feeAbove: null, hasExpiry: null, inBundle: null, text: "", includeDrafts: false, includeSuperseded: false });
+function applyFilter(f, s) {
+  const lpById = Object.fromEntries(s.lps.map((l) => [l.id, l]));
+  const text = (f.text || "").trim().toLowerCase();
+  return s.terms.filter((t) => {
+    if (t.status === "rejected") return false;
+    if (t.status === "superseded" && !f.includeSuperseded) return false;
+    if (t.status === "draft" && !f.includeDrafts) return false;
+    if (f.categories?.length && !f.categories.includes(t.category)) return false;
+    if (f.lpIds?.length && !f.lpIds.includes(t.lpId)) return false;
+    if (f.lpTypes?.length && !f.lpTypes.includes(lpById[t.lpId]?.type)) return false;
+    if (f.vehicles?.length && !f.vehicles.includes(t.vehicle)) return false;
+    if (f.mfnStatus?.length && !f.mfnStatus.includes(t.mfnStatus)) return false;
+    if (f.lpStatusBased?.length && !f.lpStatusBased.includes(t.lpStatusBased)) return false;
+    if (f.obligation?.length && !f.obligation.includes(t.obligation?.is)) return false;
+    if (f.feeBelow != null && !(t.feeRatePct != null && t.feeRatePct < f.feeBelow)) return false;
+    if (f.feeAbove != null && !(t.feeRatePct != null && t.feeRatePct > f.feeAbove)) return false;
+    if (f.hasExpiry === true && (t.expiry === "None" || !t.expiry)) return false;
+    if (f.hasExpiry === false && t.expiry && t.expiry !== "None") return false;
+    if (f.inBundle === true && !t.bundleId) return false;
+    if (f.inBundle === false && t.bundleId) return false;
+    if (text && !(t.summary + " " + t.quote + " " + t.conditions + " " + t.expiry + " " + (t.obligation?.deadline || "")).toLowerCase().includes(text)) return false;
+    return true;
+  }).sort((a, b) => lpName(a.lpId).localeCompare(lpName(b.lpId)) || catName(a.category).localeCompare(catName(b.category)));
+}
+function describeFilter(f) {
+  const out = [];
+  const list = (arr, fn) => arr.map(fn).join(" or ");
+  out.push(f.includeDrafts ? "Approved and draft terms" : "Approved terms only");
+  if (f.categories?.length) out.push("Category is " + list(f.categories, catName));
+  if (f.lpIds?.length) out.push("LP is " + list(f.lpIds, lpName));
+  if (f.lpTypes?.length) out.push("LP type is " + list(f.lpTypes, (x) => LP_TYPES[x] || x));
+  if (f.vehicles?.length) out.push("Vehicle is " + f.vehicles.join(" or "));
+  if (f.mfnStatus?.length) out.push("MFN status is " + f.mfnStatus.join(" or "));
+  if (f.lpStatusBased?.length) out.push("LP-status based is " + f.lpStatusBased.join(" or "));
+  if (f.obligation?.length) out.push("Ongoing obligation is " + f.obligation.join(" or "));
+  if (f.feeBelow != null) out.push(`Fee rate below ${f.feeBelow}%`);
+  if (f.feeAbove != null) out.push(`Fee rate above ${f.feeAbove}%`);
+  if (f.hasExpiry != null) out.push(f.hasExpiry ? "Has an expiry or trigger" : "No expiry");
+  if (f.inBundle != null) out.push(f.inBundle ? "Part of a bundle" : "Not in a bundle");
+  if (f.text) out.push(`Text contains "${f.text}"`);
+  if (f.includeSuperseded) out.push("Includes superseded terms");
+  return out;
+}
+function sanitizeFilter(raw) {
+  const f = emptyFilter(); const s = store.state; const warn = [];
+  const arr = (v, allowed, label) => { const a = Array.isArray(v) ? v.map(String) : []; const ok = a.filter((x) => allowed.includes(x)); if (ok.length < a.length) warn.push(`Ignored unknown ${label}: ${a.filter((x) => !allowed.includes(x)).join(", ")}`); return ok; };
+  f.categories = arr(raw.categories, categoryList().map((c) => c.id), "category");
+  f.lpIds = arr(raw.lpIds, s.lps.map((l) => l.id), "LP");
+  f.lpTypes = arr(raw.lpTypes, Object.keys(LP_TYPES), "LP type");
+  f.vehicles = arr(raw.vehicles, s.config?.vehicles || [], "vehicle");
+  f.mfnStatus = arr(raw.mfnStatus, ["electable", "excluded", "unclear"], "MFN status");
+  f.lpStatusBased = arr(raw.lpStatusBased, ["yes", "no", "unclear"], "LP-status value");
+  f.obligation = arr(raw.obligation, ["yes", "no", "unclear"], "obligation value");
+  const n = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  f.feeBelow = n(raw.feeBelow); f.feeAbove = n(raw.feeAbove);
+  f.hasExpiry = typeof raw.hasExpiry === "boolean" ? raw.hasExpiry : null; f.inBundle = typeof raw.inBundle === "boolean" ? raw.inBundle : null;
+  f.text = typeof raw.text === "string" ? raw.text.slice(0, 80) : "";
+  return { f, warn };
+}
+function keywordCrossCheck(f, keywords, results, s) {
+  const words = [...new Set(keywords.map((k) => String(k).trim().toLowerCase()).filter((k) => k.length > 1))];
+  if (!words.length) return { words, hits: [] };
+  const res = new Set(results.flatMap((t) => (t.paragraphs || []).map((p) => t.letterId + "#" + p)));
+  const hits = [];
+  for (const l of s.letters) {
+    if (f.lpIds?.length && !f.lpIds.includes(l.lpId)) continue;
+    const cov = C.coverage(l, s.terms);
+    (l.paragraphs || []).forEach((p, i) => {
+      const n = i + 1; const low = p.toLowerCase();
+      const found = words.filter((w) => new RegExp("(^|[^a-z0-9])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(low));
+      if (!found.length || res.has(l.id + "#" + n)) return;
+      const row = cov.rows[i];
+      let why;
+      if (row.state === "term") why = "Filed as: " + row.termIds.map((id) => { const t = s.terms.find((x) => x.id === id); return t ? `${catName(t.category)} (${t.status})` : id; }).join(", ");
+      else if (row.state === "none") why = "Marked \"no obligation\" by a reviewer";
+      else why = "Not linked to any term";
+      if (l.status !== "approved") why += " · letter not yet approved";
+      hits.push({ letter: l, n, text: p, found, why });
+    });
+  }
+  return { words, hits };
+}
+
+const EXAMPLES = [
+  "Which LPs got a management fee below 1.50%?",
+  "What did we promise Calder Climate Foundation about reporting?",
+  "Which terms are excluded from MFN because of the LP's legal status?",
+  "Who can be excused from coal or fossil fuel assets?",
+  "Which ongoing reporting obligations do we owe, and when?",
+];
+
+function SearchView() {
+  const s = useStore();
+  const [q, setQ] = useState("");
+  const [f, setF] = useState(emptyFilter());
+  const [ai, setAi] = useState(null);
+  const [open, setOpen] = useState(false);
+  const results = useMemo(() => applyFilter(f, s), [f, s.terms, s.lps, s.bundles]);
+  const kw = useMemo(() => {
+    const catKw = (f.categories?.length ? f.categories : []).flatMap((id) => categoryList().find((c) => c.id === id)?.keywords || []);
+    const words = [...(ai?.keywords || []), ...catKw, ...(f.text ? [f.text] : [])];
+    return keywordCrossCheck(f, words, results, s);
+  }, [f, ai, results, s.letters, s.terms]);
+  const hl = useMemo(() => [...(f.text ? [f.text] : [])], [f.text]);
+
+  async function ask(question) {
+    const text = (question ?? q).trim(); if (!text) return;
+    setQ(text);
+    if (!RT.sample) { setF({ ...emptyFilter(), text: text.split(/\s+/).slice(0, 3).join(" ") }); setAi({ status: "off" }); setOpen(true); return; }
+    setAi({ status: "run", question: text });
+    const cats = categoryList().map((c) => `${c.id} = ${c.name}`).join("; ");
+    const prompt = `Turn a question about a private infrastructure fund's side letters into a database filter. The filter runs over every recorded term, so the answer will be complete for whatever the filter selects. Prefer a broader filter: returning extra terms is better than missing one.
+
+Category ids: ${cats}
+LPs (id = name, type, commitment): ${s.lps.map((l) => `${l.id} = ${l.name}, ${l.type}, ${C.usd(l.commitmentUsd)}`).join("; ")}
+LP types: ${Object.keys(LP_TYPES).join(", ")}
+Vehicles: ${(s.config?.vehicles || []).join("; ")}
+Term fields: mfnStatus (electable|excluded|unclear), lpStatusBased (yes|no|unclear: term exists because of the LP's legal status), obligation (yes|no|unclear: an ongoing duty for the fund), feeRatePct (the LP's management fee rate in percent where a term sets it; standard is ${s.config?.fund?.standardFeePct ?? 1.5}), expiry, bundle membership.
+
+Question: ${text}
+
+Reply with only JSON:
+{"explanation":"one sentence saying what the filter selects","filter":{"categories":[],"lpIds":[],"lpTypes":[],"vehicles":[],"mfnStatus":[],"lpStatusBased":[],"obligation":[],"feeBelow":null,"feeAbove":null,"hasExpiry":null,"inBundle":null,"text":""},"keywords":["5 to 12 words or short phrases to scan the full text of every letter for, as a cross-check"]}
+An empty list means any value. feeBelow and feeAbove are strict percentages. Use "text" only when no structured field fits, with one short word or phrase.`;
+    try {
+      const r = await callModel(prompt);
+      const { f: nf, warn } = sanitizeFilter(r.json?.filter || {});
+      setF(nf);
+      setAi({ status: "done", question: text, explanation: String(r.json?.explanation || ""), keywords: Array.isArray(r.json?.keywords) ? r.json.keywords.map(String).slice(0, 15) : [], warn, model: r.model, modelApplied: r.modelApplied });
+    } catch (e) { setAi({ status: "error", question: text, error: errText(e) }); setOpen(true); }
+  }
+  const upd = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
+  const desc = describeFilter(f);
+  return html`<section class="view">
+    <div class="search-hero">
+      <h1>Who did we promise what?</h1>
+      <form class="askbar" onSubmit=${(e) => { e.preventDefault(); ask(); }}>
+        <input id="q" type="search" placeholder="Ask in plain English, e.g. which LPs got a fee break?" value=${q} onInput=${(e) => setQ(e.target.value)} />
+        <button class="btn primary" type="submit" disabled=${ai?.status === "run"}>${ai?.status === "run" ? "Searching…" : "Search"}</button>
+      </form>
+      <div class="examples">${EXAMPLES.map((x) => html`<button type="button" class="chip" onClick=${() => ask(x)}>${x}</button>`)}</div>
+      ${s.caps.sample === "off" ? html`<p class="note">Plain-English search needs Claude, which is not available in this view. Your words are used as a text filter; refine with the filters below.</p>` : null}
+    </div>
+
+    <div class="filterbar">
+      <div class="filter-used">
+        <span class="eyebrow">Filter used</span>
+        <div class="fchips">${desc.map((d) => html`<span class="fchip">${d}</span>`)}</div>
+        ${ai?.status === "done" && ai.explanation ? html`<p class="muted small">${ai.explanation} <span class="mono">(${ai.modelApplied || "unconfirmed model"}${ai.modelApplied !== ai.model ? `, pinned ${ai.model}` : ""}, ${C.PROMPT_VERSIONS.search})</span></p>` : null}
+        ${ai?.warn?.length ? html`<p class="note warn">${ai.warn.join(". ")}</p>` : null}
+        ${ai?.status === "error" ? html`<p class="note bad">${ai.error} Adjust the filters by hand below.</p>` : null}
+      </div>
+      <div class="filter-actions">
+        <button class="btn" type="button" onClick=${() => setOpen(!open)}>${open ? "Hide filters" : "Edit filters"}</button>
+        <button class="btn ghost" type="button" onClick=${() => { setF(emptyFilter()); setAi(null); setQ(""); }}>Clear</button>
+      </div>
+    </div>
+    ${open ? html`<div class="filters card">
+      <${Field} label="Category" wide><${Toggles} values=${f.categories} options=${categoryList().map((c) => [c.id, c.name])} onChange=${upd("categories")} /><//>
+      <${Field} label="LP" wide><${Toggles} values=${f.lpIds} options=${s.lps.map((l) => [l.id, l.name])} onChange=${upd("lpIds")} /><//>
+      <${Field} label="LP type" wide><${Toggles} values=${f.lpTypes} options=${Object.entries(LP_TYPES)} onChange=${upd("lpTypes")} /><//>
+      <${Field} label="Vehicle" wide><${Toggles} values=${f.vehicles} options=${(s.config?.vehicles || []).map((v) => [v, v])} onChange=${upd("vehicles")} /><//>
+      <${Field} label="MFN status"><${Toggles} values=${f.mfnStatus} options=${[["electable", "Electable"], ["excluded", "Excluded"], ["unclear", "Unclear"]]} onChange=${upd("mfnStatus")} /><//>
+      <${Field} label="LP-status based"><${Toggles} values=${f.lpStatusBased} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} onChange=${upd("lpStatusBased")} /><//>
+      <${Field} label="Ongoing obligation"><${Toggles} values=${f.obligation} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} onChange=${upd("obligation")} /><//>
+      <${Field} label="Fee rate below (%)"><input id="fee-below" type="number" step="0.01" value=${f.feeBelow ?? ""} onInput=${(e) => upd("feeBelow")(e.target.value === "" ? null : Number(e.target.value))} /><//>
+      <${Field} label="Fee rate above (%)"><input id="fee-above" type="number" step="0.01" value=${f.feeAbove ?? ""} onInput=${(e) => upd("feeAbove")(e.target.value === "" ? null : Number(e.target.value))} /><//>
+      <${Field} label="Expiry or trigger"><${Seg} value=${f.hasExpiry} options=${[[null, "Any"], [true, "Has one"], [false, "None"]]} onChange=${upd("hasExpiry")} /><//>
+      <${Field} label="Bundle"><${Seg} value=${f.inBundle} options=${[[null, "Any"], [true, "In a bundle"], [false, "Not bundled"]]} onChange=${upd("inBundle")} /><//>
+      <${Field} label="Text contains"><input id="ftext" type="text" value=${f.text} onInput=${(e) => upd("text")(e.target.value)} /><//>
+      <${Field} label="Include"><div class="checks">
+        <label><input id="inc-drafts" type="checkbox" checked=${f.includeDrafts} onChange=${(e) => upd("includeDrafts")(e.target.checked)} /> Draft terms awaiting review</label>
+        <label><input id="inc-sup" type="checkbox" checked=${f.includeSuperseded} onChange=${(e) => upd("includeSuperseded")(e.target.checked)} /> Superseded terms</label>
+      </div><//>
+    </div>` : null}
+
+    <div class="results-head">
+      <h2><span class="num">${results.length}</span> ${results.length === 1 ? "term matches" : "terms match"}</h2>
+      <span class="muted small">Counted from all ${s.terms.filter((t) => t.status === "approved").length} approved terms across ${s.letters.length} side letters</span>
+    </div>
+    ${ai?.status === "run" ? html`<p class="note">Asking ${s.config?.model?.pinned} to turn your question into a filter…</p>` : null}
+    <div class="results">${results.length ? results.map((t) => html`<${TermCard} key=${t.id} t=${t} words=${hl} />`) : html`<${Empty} title="No terms match this filter">Loosen the filter, or check the keyword cross-check below.<//>`}</div>
+
+    <section class="crosscheck card">
+      <h3>Keyword cross-check</h3>
+      <p class="muted small">Scans the full text of every side letter for the words below, including letters still in review, and lists any paragraph that is not already in the results. These are the places a term may have been filed under the wrong category or missed.</p>
+      ${kw.words.length ? html`<div class="fchips">${kw.words.map((w) => html`<span class="fchip mono">${w}</span>`)}</div>` : html`<p class="muted small">No keywords yet: ask a question or pick a category.</p>`}
+      ${kw.words.length ? (kw.hits.length ? html`<p><${Pill} kind="warn">${kw.hits.length} possible missed ${kw.hits.length === 1 ? "term" : "terms"}<//></p>
+        <ul class="hits">${kw.hits.map((h) => html`<li>
+          <div class="hit-h"><a href=${"#letter-" + h.letter.id}>${lpName(h.letter.lpId)} · ¶ ${h.n}</a> <span class="muted small">${h.why}</span></div>
+          <p class="hit-t"><${Highlight} text=${h.text} words=${h.found} /></p></li>`)}</ul>`
+        : html`<p><${Pill} kind="ok">Every paragraph containing these words is in the results<//></p>`) : null}
+    </section>
+  </section>`;
+}
+
+/* ---------------- Letters ---------------- */
+function letterCounts(l, s) {
+  const terms = s.terms.filter((t) => t.letterId === l.id && C.isLive(t));
+  const flags = terms.filter((t) => t.status === "draft").reduce((a, t) => a + C.termFlags(t, l).length, 0) + (l.status === "needs_review" ? C.letterFlags(l, s.terms).length : 0);
+  return { terms: terms.length, approved: terms.filter((t) => t.status === "approved").length, flags };
+}
+function LettersView() {
+  const s = useStore();
+  const rows = [...s.letters].sort((a, b) => (a.signedDate < b.signedDate ? 1 : -1));
+  return html`<section class="view">
+    <div class="view-h"><h1>Side letters</h1><button class="btn primary" onClick=${() => go("#add")} disabled=${s.readOnly}>Add a side letter</button></div>
+    <div class="tablewrap"><table class="tbl">
+      <thead><tr><th>LP</th><th>Signed</th><th>Vehicle</th><th>Source</th><th>Terms</th><th>Status</th><th>Flags</th></tr></thead>
+      <tbody>${rows.map((l) => { const c = letterCounts(l, s); return html`<tr key=${l.id} class="rowlink" onClick=${() => go("#letter-" + l.id)}>
+        <td><a href=${"#letter-" + l.id}>${lpName(l.lpId)}</a><div class="muted small">${l.title}</div></td>
+        <td class="num">${fmtDate(l.signedDate)}</td><td>${l.vehicle}</td><td>${{ sample: "Sample text", docx: "Word", pdf: "PDF", paste: "Pasted text", manual: "Entered by hand" }[l.source] || l.source}</td>
+        <td class="num">${c.approved}/${c.terms}</td><td><${StatusPill} status=${l.status} /></td>
+        <td>${c.flags ? html`<${Pill} kind="warn">${c.flags}<//>` : html`<span class="muted">—</span>`}</td></tr>`; })}</tbody>
+    </table></div>
+  </section>`;
+}
+
+function IntegrityBox({ letter }) {
+  const s = useStore();
+  const o = s.originals.find((x) => x.id === letter.originalId);
+  const res = o ? s.integrity[o.id] : null;
+  const auditReady = !!s.ready.audit && !!s.chain;
+  useEffect(() => { if (o && auditReady && !res) verifyOriginal(o); }, [o?.id, o?.sha256, auditReady]);
+  if (letter.source === "manual") return html`<div class="card integrity"><h3>Original document</h3><p class="muted">Terms were entered by hand; there is no source document stored.</p></div>`;
+  if (!o) return html`<div class="card integrity bad"><h3>Original document</h3><p>No original is stored for this letter.</p></div>`;
+  async function download() {
+    if (!RT.downloads) return;
+    try { const r = await verifyOriginal(o); if (r.status !== "ok") { toast("bad", "Download stopped: the file failed its integrity check."); return; }
+      const bytes = await originalBytes(o); await RT.downloads.save({ filename: o.filename, data: bytes }); } catch (e) { if (e?.code !== "cancelled") toast("bad", errText(e)); }
+  }
+  const st = res?.status || "checking";
+  return html`<div class=${"card integrity " + (st === "ok" ? "ok" : st === "checking" ? "" : "bad")}>
+    <div class="integ-h"><h3>Original document</h3>
+      ${st === "ok" ? html`<${Pill} kind="ok">Integrity verified<//>` : st === "checking" ? html`<${Pill} kind="info">Checking…<//>` : html`<${Pill} kind="bad">${st === "error" ? "Could not check" : "Integrity check failed"}<//>`}</div>
+    <dl class="facts">
+      <div><dt>File</dt><dd>${o.filename}</dd></div>
+      <div><dt>Size</dt><dd class="num">${o.sizeBytes?.toLocaleString()} bytes</dd></div>
+      <div><dt>Stored as</dt><dd>${{ asset: "Read-only file (asset store)", "asset-b64": "Read-only file (asset store, encoded)", "inline-text": "Text in the database", "inline-b64": "Encoded file in the database" }[o.storage]}</dd></div>
+      <div><dt>Stored</dt><dd>${fmtTime(o.createdAt)} by ${nameOf(o.createdBy)}</dd></div>
+    </dl>
+    <div class="hashes">
+      <div><span class="flabel">SHA-256 saved with the file</span><code class="hash">${o.sha256}</code></div>
+      <div><span class="flabel">SHA-256 in the audit log</span><code class="hash">${res?.logged || "—"}</code></div>
+      <div><span class="flabel">SHA-256 computed just now</span><code class="hash">${res?.computed || "—"}</code></div>
+    </div>
+    <p class="small">${res?.message || "Computing the file's hash…"} ${res?.at ? html`<span class="muted">Checked ${fmtTime(res.at)}.</span>` : null}</p>
+    <div class="row">
+      <button class="btn" onClick=${() => verifyOriginal(o)}>Verify again</button>
+      ${o.storage === "asset" ? html`<a class="btn" href=${"/_blob/" + o.assetId} target="_blank" rel="noopener">Open PDF</a>` : null}
+      ${s.caps.downloads === "on" ? html`<button class="btn" onClick=${download}>Download original</button>` : null}
+    </div>
+  </div>`;
+}
+
+function LetterDetail({ id }) {
+  const s = useStore();
+  const l = s.letters.find((x) => x.id === id);
+  const [supersede, setSupersede] = useState(null);
+  if (!l) return html`<section class="view"><${Empty} title="Side letter not found">It may still be loading. <a href="#letters">Back to side letters</a><//></section>`;
+  const lp = s.lps.find((x) => x.id === l.lpId);
+  const terms = s.terms.filter((t) => t.letterId === l.id);
+  const cov = C.coverage(l, s.terms);
+  async function doSupersede(t, reason) {
+    await act("Marking superseded", async () => {
+      await patch("terms/" + t.id, { status: "superseded", supersededReason: reason, supersededAt: new Date().toISOString(), supersededBy: RT.meId });
+      await appendAudit("term.superseded", "term", t.id, `Marked superseded: ${t.summary}`, { reason, before: { status: t.status } });
+      toast("ok", "Term marked superseded."); setSupersede(null);
+    });
+  }
+  return html`<section class="view">
+    <a class="back" href="#letters">← Side letters</a>
+    <div class="view-h"><div><h1>${lp?.name || "Unknown LP"}</h1><p class="muted">${l.title} · signed ${fmtDate(l.signedDate)} · ${l.vehicle} · ${LP_TYPES[lp?.type] || ""} · ${C.usd(lp?.commitmentUsd)}</p></div>
+      <div class="row"><${StatusPill} status=${l.status} />${l.status === "needs_review" || l.status === "failed" ? html`<button class="btn primary" onClick=${() => go("#review-" + l.id)}>Open review</button>` : null}</div></div>
+    ${l.status === "failed" ? html`<div class="note bad">Extraction failed: ${l.extraction?.error || "unknown error"}. Open the review to retry or enter the terms by hand.</div>` : null}
+    <${IntegrityBox} letter=${l} />
+    <div class="two">
+      <div class="card"><h3>Letter text</h3>
+        <ol class="paras">${(l.paragraphs || []).map((p, i) => { const row = cov.rows[i]; return html`<li class=${"para p-" + row.state}>
+          <span class="pn">¶ ${i + 1}</span><div><p>${p}</p><div class="small muted">${row.state === "term" ? row.termIds.map((tid) => catName(s.terms.find((t) => t.id === tid)?.category)).join(", ") : row.state === "none" ? "No obligation" : html`<${Pill} kind="warn">Not linked to a term<//>`}</div></div></li>`; })}</ol>
+        ${l.source === "manual" ? html`<p class="muted">No letter text: terms entered by hand.</p>` : null}
+      </div>
+      <div class="stack">
+        <h3>${terms.length} terms</h3>
+        ${terms.map((t) => html`<${TermCard} key=${t.id} t=${t} showLp=${false} extra=${html`<div>
+          <${Provenance} t=${t} />
+          ${t.status === "superseded" ? html`<p class="small muted">Superseded ${fmtTime(t.supersededAt)}: ${t.supersededReason}</p>` : null}
+          ${t.status === "approved" && !s.readOnly ? (supersede?.id === t.id ? html`<form class="row" onSubmit=${(e) => { e.preventDefault(); if (supersede.reason.trim()) doSupersede(t, supersede.reason.trim()); }}>
+              <input id=${"sup-" + t.id} type="text" placeholder="Reason, e.g. amended by letter of 3 Feb 2027" value=${supersede.reason} onInput=${(e) => setSupersede({ ...supersede, reason: e.target.value })} />
+              <button class="btn" type="submit">Confirm</button><button class="btn ghost" type="button" onClick=${() => setSupersede(null)}>Cancel</button></form>`
+            : html`<button class="btn ghost small" onClick=${() => setSupersede({ id: t.id, reason: "" })}>Mark superseded</button>`) : null}
+        </div>`} />`)}
+        ${l.extraction ? html`<p class="small muted">Extraction: ${l.extraction.modelApplied || l.extraction.model} · prompt ${l.extraction.promptVersion} · ${fmtTime(l.extraction.at)}</p>` : null}
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ---------------- Intake ---------------- */
+function IntakeView() {
+  const s = useStore();
+  const [lpId, setLpId] = useState("");
+  const [newLp, setNewLp] = useState({ name: "", type: "public_pension", commitment: "", vehicle: "", close: "" });
+  const [vehicle, setVehicle] = useState("");
+  const [signed, setSigned] = useState(new Date().toISOString().slice(0, 10));
+  const [title, setTitle] = useState("Side letter");
+  const [mode, setMode] = useState("upload");
+  const [file, setFile] = useState(null);
+  const [text, setText] = useState("");
+  const [steps, setSteps] = useState([]);
+  const [running, setRunning] = useState(false);
+  const [doneId, setDoneId] = useState(null);
+  const ctl = useRef(null);
+  const vehicles = s.config?.vehicles || [];
+  const lp = s.lps.find((l) => l.id === lpId);
+  useEffect(() => { if (lp && !vehicle) setVehicle(lp.vehicle); }, [lpId]);
+  const setStep = (k, st, t) => setSteps((xs) => { const i = xs.findIndex((x) => x.k === k); const n = { k, st, t }; return i >= 0 ? xs.map((x, j) => (j === i ? n : x)) : [...xs, n]; });
+
+  const ready = (lpId === "new" ? newLp.name.trim() && Number(newLp.commitment) > 0 : !!lpId) && vehicle && signed && (mode === "manual" || (mode === "upload" ? !!file : text.trim().length > 40));
+
+  async function start() {
+    setSteps([]); setRunning(true); setDoneId(null); ctl.current = new AbortController();
+    const ok = await act("Adding side letter", async () => {
+      let theLpId = lpId;
+      if (lpId === "new") {
+        theLpId = rid("lp");
+        const doc = { name: newLp.name.trim(), type: newLp.type, commitmentUsd: Math.round(Number(newLp.commitment) * 1e6), vehicle: newLp.vehicle || vehicle, close: newLp.close || "", mfn: { hasMfn: true, basis: "size", thresholdUsd: null, excludedCategories: [], excludedTermIds: [], note: "" } };
+        await put("lps/" + theLpId, doc);
+        await appendAudit("lp.created", "lp", theLpId, `Added LP ${doc.name} (${C.usd(doc.commitmentUsd)})`, { after: doc });
+        setStep("lp", "ok", `Added LP ${doc.name}`);
+      }
+      const letterId = rid("sl");
+      let paragraphs = [], source = mode === "manual" ? "manual" : mode === "paste" ? "paste" : null, originalId = null;
+      if (mode !== "manual") {
+        let bytes = null, kind = "paste", raw = text;
+        if (mode === "upload") {
+          const name = file.name.toLowerCase();
+          kind = name.endsWith(".pdf") ? "pdf" : name.endsWith(".docx") ? "docx" : null;
+          if (!kind) throw new Error("Upload a .docx or .pdf file. Older .doc files must be saved as .docx first.");
+          source = kind;
+          bytes = new Uint8Array(await file.arrayBuffer());
+          setStep("read", "ok", `Read ${file.name} (${bytes.length.toLocaleString()} bytes)`);
+        }
+        setStep("store", "run", "Storing the original and computing its SHA-256…");
+        const st = await storeOriginal({ kind, file, bytes, text: raw, letterId });
+        originalId = st.origId;
+        setStep("store", "ok", `Original stored read-only · SHA-256 ${short(st.sha)}`);
+        setStep("text", "run", "Extracting text…");
+        if (kind === "docx") raw = await docxToText(bytes);
+        if (kind === "pdf") raw = await pdfToText(bytes);
+        paragraphs = C.splitParagraphs(raw);
+        if (!paragraphs.length) throw new Error(kind === "pdf" ? "No text found in this PDF. It may be a scan; paste the text instead or enter terms by hand." : "No text found in this document.");
+        setStep("text", "ok", `${paragraphs.length} paragraphs`);
+      }
+      const letter = { lpId: theLpId, vehicle, signedDate: signed, title: title.trim() || "Side letter", source, originalId, paragraphs, noObligation: [], status: mode === "manual" ? "needs_review" : "pending", extraction: null, secondPass: null, createdAt: new Date().toISOString(), createdBy: RT.meId };
+      await put("letters/" + letterId, letter);
+      await appendAudit("letter.created", "letter", letterId, `Added side letter for ${lpName(theLpId) === "Unknown LP" ? newLp.name : lpName(theLpId)} (${mode === "manual" ? "terms entered by hand" : paragraphs.length + " paragraphs"})`, { originalId, source, vehicle, signedDate: signed, paragraphs: paragraphs.length });
+      setDoneId(letterId);
+      if (mode !== "manual") {
+        if (!RT.sample) { await patch("letters/" + letterId, { status: "failed", extraction: { error: "Claude is not available in this view", at: new Date().toISOString(), by: RT.meId } }); setStep("extract", "bad", "Claude is not available here. Open the review to enter the terms by hand."); return true; }
+        // wait for the letter to arrive in the store
+        for (let i = 0; i < 40 && !store.state.letters.find((x) => x.id === letterId); i++) await sleep(100);
+        try { await runExtraction(letterId, { onStep: setStep, signal: ctl.current.signal }); } catch (e) { /* step shows the error; letter is marked failed */ }
+      }
+      return true;
+    });
+    setRunning(false);
+  }
+
+  return html`<section class="view narrow">
+    <a class="back" href="#letters">← Side letters</a>
+    <h1>Add a side letter</h1>
+    <p class="muted">The original is stored read-only with its SHA-256 fingerprint. Claude (${s.config?.model?.pinned || "pinned model"}) drafts the terms; nothing becomes searchable until a person approves it.</p>
+    <div class="card form">
+      <h3>1. Which LP and vehicle</h3>
+      <div class="grid2">
+        <${Field} label="LP"><select id="in-lp" value=${lpId} onChange=${(e) => setLpId(e.target.value)}>
+          <option value="">Choose an LP…</option>${[...s.lps].sort((a, b) => a.name.localeCompare(b.name)).map((l) => html`<option value=${l.id}>${l.name}</option>`)}<option value="new">+ New LP not listed</option></select><//>
+        <${Field} label="Fund or vehicle"><select id="in-veh" value=${vehicle} onChange=${(e) => setVehicle(e.target.value)}><option value="">Choose…</option>${vehicles.map((v) => html`<option value=${v}>${v}</option>`)}</select><//>
+        <${Field} label="Date signed"><input id="in-date" type="date" value=${signed} onInput=${(e) => setSigned(e.target.value)} /><//>
+        <${Field} label="Title"><input id="in-title" type="text" value=${title} onInput=${(e) => setTitle(e.target.value)} /><//>
+      </div>
+      ${lpId === "new" ? html`<div class="grid2 sub">
+        <${Field} label="LP name"><input id="nl-name" type="text" value=${newLp.name} onInput=${(e) => setNewLp({ ...newLp, name: e.target.value })} /><//>
+        <${Field} label="LP type"><select id="nl-type" value=${newLp.type} onChange=${(e) => setNewLp({ ...newLp, type: e.target.value })}>${Object.entries(LP_TYPES).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select><//>
+        <${Field} label="Commitment ($M)"><input id="nl-commit" type="number" min="0" step="0.5" value=${newLp.commitment} onInput=${(e) => setNewLp({ ...newLp, commitment: e.target.value })} /><//>
+        <${Field} label="Closing"><input id="nl-close" type="text" placeholder="e.g. Second closing" value=${newLp.close} onInput=${(e) => setNewLp({ ...newLp, close: e.target.value })} /><//>
+        <p class="small muted wide">Set this LP's MFN rules on the LPs page after adding.</p>
+      </div>` : null}
+      <h3>2. The letter</h3>
+      <${Seg} value=${mode} onChange=${setMode} options=${[["upload", "Upload Word or PDF"], ["paste", "Paste text"], ["manual", "Enter terms by hand"]]} />
+      ${mode === "upload" ? html`<label class="drop"><input id="in-file" type="file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange=${(e) => setFile(e.target.files[0] || null)} />
+        <span>${file ? html`<strong>${file.name}</strong> · ${file.size.toLocaleString()} bytes` : "Choose a .docx or .pdf file"}</span></label>
+        <p class="small muted">${s.caps.assets === "on" ? "Originals go to the artifact's file store, where a stored file can't be edited in place." : "File storage needs Editor access here; small files are kept in the database instead."} Scanned PDFs without a text layer can't be read.</p>` : null}
+      ${mode === "paste" ? html`<textarea id="in-text" rows="12" placeholder="Paste the full side letter. Leave a blank line between paragraphs." value=${text} onInput=${(e) => setText(e.target.value)}></textarea>` : null}
+      ${mode === "manual" ? html`<p class="note">You'll add each term on the review screen. Without a stored letter, the exact-quote and coverage checks can't run, so each term is flagged "entered by hand" until someone checks it against the signed copy.</p>` : null}
+      <div class="row end"><button class="btn primary" disabled=${!ready || running || s.readOnly} onClick=${start}>${running ? "Working…" : mode === "manual" ? "Create and start entering terms" : "Store and extract terms"}</button>
+        ${running ? html`<button class="btn ghost" onClick=${() => ctl.current?.abort()}>Stop</button>` : null}</div>
+    </div>
+    ${steps.length ? html`<div class="card"><h3>Progress</h3><ol class="steps">${steps.map((x) => html`<li class=${"step " + x.st}><span class="dot"></span>${x.t}</li>`)}</ol>
+      ${doneId && !running ? html`<div class="row"><button class="btn primary" onClick=${() => go("#review-" + doneId)}>Open review</button><button class="btn" onClick=${() => go("#letter-" + doneId)}>View letter</button></div>` : null}</div>` : null}
+  </section>`;
+}
+
+/* ===== UI part 2: review and approval, MFN, LPs ===== */
+
+const TERM_FIELDS = ["category", "summary", "quote", "paragraphs", "vehicle", "conditions", "expiry", "lpStatusBased", "mfnStatus", "mfnReason", "obligation", "feeRatePct", "carryPct", "bundleId"];
+function diffTerm(a, b) {
+  const ch = {};
+  for (const k of TERM_FIELDS) if (C.canon(a[k] ?? null) !== C.canon(b[k] ?? null)) ch[k] = { before: a[k] ?? null, after: b[k] ?? null };
+  return ch;
+}
+function approvalBlockers(t, letter) {
+  const out = [];
+  if (letter && letter.source !== "manual" && C.quoteCheck(t.quote, letter.paragraphs).status === "fail") out.push("The quote must appear word-for-word in the letter");
+  if (t.mfnStatus !== "electable" && t.mfnStatus !== "excluded") out.push("Set MFN status to electable or excluded");
+  else if (!String(t.mfnReason || "").trim()) out.push("Give a reason for the MFN status");
+  if (t.category === C.UNCLEAR) out.push("Choose a category");
+  if (!String(t.summary || "").trim() || t.summary === C.UNCLEAR) out.push("Write a summary");
+  const open = (letter?.secondPass?.issues || []).filter((i) => !i.resolved && i.termId === t.id);
+  if (open.length) out.push("Resolve the second-pass issue on this term");
+  return out;
+}
+
+/* Saves a term (new or existing), keeps bundle membership in sync, writes one audit entry. */
+async function saveTerm({ original, draft, letter, newBundle, approve, auditAction }) {
+  const isNew = !original;
+  const id = original?.id || rid("t");
+  let bundleId = draft.bundleId || null;
+  if (bundleId === "__new") {
+    bundleId = rid("bnd");
+    await put("bundles/" + bundleId, { name: newBundle.name.trim() || "Bundle", lpId: letter.lpId, termIds: [], allOrNothing: !!newBundle.allOrNothing, note: newBundle.note || "", createdBy: RT.meId, createdAt: new Date().toISOString() });
+    await appendAudit("bundle.created", "bundle", bundleId, `Created bundle "${newBundle.name.trim() || "Bundle"}" for ${lpName(letter.lpId)}`, { allOrNothing: !!newBundle.allOrNothing });
+  }
+  const body = {}; for (const k of TERM_FIELDS) body[k] = draft[k] ?? null;
+  body.bundleId = bundleId;
+  const oldBundle = original?.bundleId || null;
+  const changes = diffTerm(original || {}, body);
+  const now = new Date().toISOString();
+  if (isNew) {
+    await put("terms/" + id, { ...body, letterId: letter.id, lpId: letter.lpId, status: approve ? "approved" : "draft", origin: "manual",
+      provenance: { model: null, modelApplied: undefined, promptVersion: "manual entry", extractedAt: now, extractedBy: RT.meId, approvedBy: approve ? RT.meId : null, approvedAt: approve ? now : null } });
+  } else {
+    const upd = { ...body };
+    if (approve) { upd.status = "approved"; upd.provenance = { ...(original.provenance || {}), approvedBy: RT.meId, approvedAt: now }; }
+    await patch("terms/" + id, upd);
+  }
+  if (oldBundle !== bundleId) {
+    const s = store.state;
+    if (oldBundle) { const b = s.bundles.find((x) => x.id === oldBundle); if (b) await patch("bundles/" + oldBundle, { termIds: b.termIds.filter((x) => x !== id) }); }
+    if (bundleId) { const b = s.bundles.find((x) => x.id === bundleId); const ids = b ? b.termIds : []; await patch("bundles/" + bundleId, { termIds: [...new Set([...ids, id])] }); }
+  }
+  const verb = isNew ? (approve ? "Added and approved" : "Added") : approve ? (Object.keys(changes).length ? "Edited and approved" : "Approved") : "Edited";
+  await appendAudit(auditAction || (isNew ? "term.created" : approve ? "term.approved" : "term.edited"), "term", id, `${verb} ${catName(body.category)} term for ${lpName(letter.lpId)}: ${body.summary}`,
+    { letterId: letter.id, changes, quoteCheck: C.quoteCheck(body.quote, letter.paragraphs).status, unclear: C.unclearFields(body).map((u) => u.field) });
+  return id;
+}
+
+function TermEditor({ t, letter, onDone, isNew, seed }) {
+  const s = useStore();
+  const base = t || { category: C.UNCLEAR, summary: "", quote: "", paragraphs: [], vehicle: letter.vehicle, conditions: "None", expiry: "None", lpStatusBased: "no", mfnStatus: C.UNCLEAR, mfnReason: "", obligation: { is: "no", deadline: "" }, feeRatePct: null, carryPct: null, bundleId: null, ...(seed || {}) };
+  const [d, setD] = useState({ ...base, obligation: { ...(base.obligation || {}) } });
+  const [paraText, setParaText] = useState((base.paragraphs || []).join(", "));
+  const [nb, setNb] = useState({ name: "", allOrNothing: true, note: "" });
+  const [rejecting, setRejecting] = useState(null);
+  useEffect(() => { if (t && !isNew) { setD({ ...t, obligation: { ...(t.obligation || {}) } }); setParaText((t.paragraphs || []).join(", ")); } }, [t && C.canon(t)]);
+  const up = (k, v) => setD((x) => ({ ...x, [k]: v }));
+  const qc = C.quoteCheck(d.quote, letter.source === "manual" ? [] : letter.paragraphs);
+  const draftForCheck = { ...d, id: t?.id };
+  const blockers = approvalBlockers(draftForCheck, letter);
+  const unclear = C.unclearFields(d);
+  const dirty = isNew || Object.keys(diffTerm(t || {}, { ...d, bundleId: d.bundleId || null })).length > 0;
+  const lpBundles = s.bundles.filter((b) => b.lpId === letter.lpId);
+  const openIssues = (letter.secondPass?.issues || []).filter((i) => !i.resolved && t && i.termId === t.id);
+  const ro = s.readOnly || (t && t.status !== "draft" && !isNew);
+  const vehicles = s.config?.vehicles || [];
+  function setParas(v) { setParaText(v); up("paragraphs", [...new Set(v.split(/[^0-9]+/).map(Number).filter((n) => n >= 1 && n <= (letter.paragraphs || []).length))].sort((a, b) => a - b)); }
+
+  async function save(approve) {
+    const r = await act(approve ? "Approving" : "Saving", async () => {
+      await saveTerm({ original: isNew ? null : t, draft: d, letter, newBundle: nb, approve });
+      toast("ok", approve ? "Term approved. It is now searchable." : "Saved."); return true;
+    });
+    if (r && onDone) onDone();
+  }
+  async function reject() {
+    await act("Rejecting", async () => {
+      await patch("terms/" + t.id, { status: "rejected", rejectedReason: rejecting, rejectedBy: RT.meId, rejectedAt: new Date().toISOString() });
+      await appendAudit("term.rejected", "term", t.id, `Rejected draft term for ${lpName(letter.lpId)}: ${t.summary}`, { reason: rejecting });
+      toast("ok", "Term rejected."); setRejecting(null);
+    });
+  }
+  async function resolveIssue(iss, note) {
+    await act("Resolving", async () => {
+      const issues = (letter.secondPass.issues || []).map((i) => (i.id === iss.id ? { ...i, resolved: true, resolution: note, resolvedBy: RT.meId, resolvedAt: new Date().toISOString() } : i));
+      await patch("letters/" + letter.id, { secondPass: { ...letter.secondPass, issues } });
+      await appendAudit("secondpass.resolved", "letter", letter.id, `Resolved second-pass issue: ${iss.problem}`, { issueId: iss.id, termId: iss.termId, resolution: note });
+    });
+  }
+  const flags = t ? C.termFlags(t, letter) : [];
+  return html`<article class=${"term editor " + (t?.status || "draft")}>
+    <header class="term-h">
+      ${t ? html`<${StatusPill} status=${t.status} />` : html`<${Pill} kind="info">New term<//>`}
+      <${Pill} kind="cat">${catName(d.category)}<//>
+      ${qc.status === "pass" ? html`<${Pill} kind="ok">Quote found ✓<//>` : qc.status === "fail" ? html`<${Pill} kind="bad">Quote not found<//>` : html`<${Pill} kind="neutral">No source to check<//>`}
+      ${unclear.length ? html`<${Pill} kind="warn">${unclear.length} unclear<//>` : null}
+    </header>
+    ${flags.length && t?.status === "draft" ? html`<ul class="flags">${flags.map((f) => html`<li class=${"flag " + f.type}>${f.message}</li>`)}</ul>` : null}
+    ${openIssues.map((iss) => html`<${IssueResolver} key=${iss.id} iss=${iss} onResolve=${resolveIssue} disabled=${s.readOnly} />`)}
+    <fieldset disabled=${ro}>
+    <div class="egrid">
+      <${Field} label="Category"><select id=${"cat-" + (t?.id || "new")} value=${d.category} onChange=${(e) => up("category", e.target.value)}><option value="unclear">Unclear</option>${categoryList().map((c) => html`<option value=${c.id}>${c.name}</option>`)}</select><//>
+      <${Field} label="Paragraphs" hint="e.g. 2, 5"><input id=${"par-" + (t?.id || "new")} type="text" value=${paraText} onInput=${(e) => setParas(e.target.value)} /><//>
+      <${Field} label="Summary" wide><textarea id=${"sum-" + (t?.id || "new")} rows="2" value=${d.summary} onInput=${(e) => up("summary", e.target.value)}></textarea><//>
+      <${Field} label="Exact quote from the letter" wide hint=${qc.status === "pass" ? "Found word-for-word in ¶ " + (qc.paragraphs || []).join(", ") : qc.message}><textarea class=${"quote-in " + qc.status} id=${"quo-" + (t?.id || "new")} rows="3" value=${d.quote} onInput=${(e) => up("quote", e.target.value)}></textarea><//>
+      <${Field} label="Fund or vehicle"><select id=${"veh-" + (t?.id || "new")} value=${d.vehicle} onChange=${(e) => up("vehicle", e.target.value)}><option value="unclear">Unclear</option>${vehicles.map((v) => html`<option value=${v}>${v}</option>`)}</select><//>
+      <${Field} label="Conditions attached" hint='"None" if none'><input id=${"con-" + (t?.id || "new")} type="text" value=${d.conditions} onInput=${(e) => up("conditions", e.target.value)} /><//>
+      <${Field} label="Expiry date or trigger" hint='"None" if none'><input id=${"exp-" + (t?.id || "new")} type="text" value=${d.expiry} onInput=${(e) => up("expiry", e.target.value)} /><//>
+      <${Field} label="LP-status based"><${Seg} value=${d.lpStatusBased} onChange=${(v) => up("lpStatusBased", v)} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} /><//>
+      <${Field} label="MFN status"><${Seg} value=${d.mfnStatus} onChange=${(v) => up("mfnStatus", v)} options=${[["electable", "Electable"], ["excluded", "Excluded"], ["unclear", "Unclear"]]} /><//>
+      <${Field} label="MFN reason"><input id=${"mfr-" + (t?.id || "new")} type="text" value=${d.mfnReason} onInput=${(e) => up("mfnReason", e.target.value)} /><//>
+      <${Field} label="Ongoing obligation for the fund"><${Seg} value=${d.obligation?.is} onChange=${(v) => up("obligation", { ...d.obligation, is: v })} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} /><//>
+      ${d.obligation?.is === "yes" ? html`<${Field} label="Deadline or frequency"><input id=${"dl-" + (t?.id || "new")} type="text" value=${d.obligation.deadline} onInput=${(e) => up("obligation", { ...d.obligation, deadline: e.target.value })} /><//>` : null}
+      <${Field} label="Management fee rate (%)" hint="Resulting rate, if this term sets one"><input id=${"fee-" + (t?.id || "new")} type="number" step="0.01" value=${d.feeRatePct ?? ""} onInput=${(e) => up("feeRatePct", e.target.value === "" ? null : Number(e.target.value))} /><//>
+      <${Field} label="Carried interest (%)"><input id=${"car-" + (t?.id || "new")} type="number" step="0.5" value=${d.carryPct ?? ""} onInput=${(e) => up("carryPct", e.target.value === "" ? null : Number(e.target.value))} /><//>
+      <${Field} label="Bundle" hint="Terms granted together or tied to a condition"><select id=${"bnd-" + (t?.id || "new")} value=${d.bundleId || ""} onChange=${(e) => up("bundleId", e.target.value || null)}>
+        <option value="">Not bundled</option>${lpBundles.map((b) => html`<option value=${b.id}>${b.name}${b.allOrNothing ? " (all-or-nothing)" : ""}</option>`)}<option value="__new">+ New bundle…</option></select><//>
+      ${d.bundleId === "__new" ? html`<div class="wide newbundle">
+        <${Field} label="Bundle name"><input id=${"nbn-" + (t?.id || "new")} type="text" value=${nb.name} onInput=${(e) => setNb({ ...nb, name: e.target.value })} /><//>
+        <label class="check"><input id=${"nba-" + (t?.id || "new")} type="checkbox" checked=${nb.allOrNothing} onChange=${(e) => setNb({ ...nb, allOrNothing: e.target.checked })} /> All-or-nothing: an electing LP must take every term in the bundle</label>
+        <${Field} label="Why these go together"><input id=${"nbt-" + (t?.id || "new")} type="text" value=${nb.note} onInput=${(e) => setNb({ ...nb, note: e.target.value })} /><//>
+      </div>` : null}
+    </div>
+    </fieldset>
+    ${t ? html`<${Provenance} t=${t} />` : null}
+    ${!ro ? html`<div class="row end">
+      ${blockers.length ? html`<span class="small bad-text">Before approving: ${blockers.join("; ")}.</span>` : unclear.length ? html`<span class="small muted">Approving keeps ${unclear.map((u) => u.label.toLowerCase()).join(", ")} as unclear.</span>` : null}
+      ${t && !isNew ? (rejecting !== null ? html`<input id=${"rej-" + t.id} type="text" placeholder="Why reject?" value=${rejecting} onInput=${(e) => setRejecting(e.target.value)} /><button class="btn" disabled=${!rejecting.trim()} onClick=${reject}>Confirm reject</button><button class="btn ghost" onClick=${() => setRejecting(null)}>Cancel</button>`
+        : html`<button class="btn ghost" onClick=${() => setRejecting("")}>Reject</button>`) : null}
+      ${isNew && onDone ? html`<button class="btn ghost" onClick=${onDone}>Cancel</button>` : null}
+      <button class="btn" disabled=${!dirty} onClick=${() => save(false)}>${isNew ? "Save as draft" : "Save changes"}</button>
+      <button class="btn primary" disabled=${blockers.length > 0} onClick=${() => save(true)}>${dirty && !isNew ? "Save and approve" : "Approve"}</button>
+    </div>` : null}
+  </article>`;
+}
+
+function IssueResolver({ iss, onResolve, disabled }) {
+  const [note, setNote] = useState("");
+  return html`<div class="issue"><div><${Pill} kind=${iss.severity === "high" ? "bad" : "warn"}>Second pass · ${iss.severity}<//> ${iss.paragraph ? html`<span class="muted small">¶ ${iss.paragraph}</span>` : null}</div>
+    <p>${iss.problem}</p>
+    <form class="row" onSubmit=${(e) => { e.preventDefault(); if (note.trim()) onResolve(iss, note.trim()); }}>
+      <input id=${"iss-" + iss.id} type="text" placeholder="What you checked or changed" value=${note} onInput=${(e) => setNote(e.target.value)} disabled=${disabled} />
+      <button class="btn" type="submit" disabled=${disabled || !note.trim()}>Mark resolved</button></form></div>`;
+}
+
+function ReviewList() {
+  const s = useStore();
+  const rows = s.letters.filter((l) => ["needs_review", "failed", "extracting", "pending"].includes(l.status));
+  return html`<section class="view">
+    <div class="view-h"><h1>Review queue</h1><button class="btn primary" onClick=${() => go("#add")} disabled=${s.readOnly}>Add a side letter</button></div>
+    <p class="muted">Terms stay out of search until a person approves them. Flagged and unclear items are listed first on each letter.</p>
+    ${rows.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Signed</th><th>Status</th><th>Draft terms</th><th>Flags</th><th></th></tr></thead><tbody>
+      ${rows.map((l) => { const c = letterCounts(l, s); const drafts = s.terms.filter((t) => t.letterId === l.id && t.status === "draft").length; return html`<tr key=${l.id}>
+        <td>${lpName(l.lpId)}</td><td class="num">${fmtDate(l.signedDate)}</td><td><${StatusPill} status=${l.status} /></td><td class="num">${drafts}</td>
+        <td>${c.flags ? html`<${Pill} kind="warn">${c.flags}<//>` : "—"}</td><td><button class="btn small" onClick=${() => go("#review-" + l.id)}>Review</button></td></tr>`; })}
+    </tbody></table></div>` : html`<${Empty} title="Nothing waiting for review">New side letters appear here after extraction.<//>`}
+  </section>`;
+}
+
+function ReviewLetter({ id }) {
+  const s = useStore();
+  const l = s.letters.find((x) => x.id === id);
+  const [adding, setAdding] = useState(null);
+  const [retry, setRetry] = useState(null);
+  if (!l) return html`<section class="view"><${Empty} title="Side letter not found"><a href="#review">Back to the review queue</a><//></section>`;
+  const terms = s.terms.filter((t) => t.letterId === l.id);
+  const cov = C.coverage(l, s.terms);
+  const lflags = C.letterFlags(l, s.terms);
+  const rank = (t) => (t.status === "draft" ? (C.termFlags(t, l).length ? 0 : 1) : t.status === "approved" ? 2 : 3);
+  const sorted = [...terms].sort((a, b) => rank(a) - rank(b));
+  const drafts = terms.filter((t) => t.status === "draft");
+  const openIssues = (l.secondPass?.issues || []).filter((i) => !i.resolved);
+  const canFinish = l.status === "needs_review" && !drafts.length && !cov.unaccounted.length && !openIssues.length && terms.some((t) => t.status === "approved");
+
+  async function setNoObligation(n, on) {
+    await act("Updating", async () => {
+      const set = new Set(l.noObligation || []); on ? set.add(n) : set.delete(n);
+      await patch("letters/" + l.id, { noObligation: [...set].sort((a, b) => a - b) });
+      await appendAudit(on ? "paragraph.no_obligation" : "paragraph.unmarked", "letter", l.id, `${on ? "Marked" : "Unmarked"} ¶ ${n} of ${lpName(l.lpId)} letter as "no obligation"`, { paragraph: n });
+    });
+  }
+  async function resolveIssue(iss, note) {
+    await act("Resolving", async () => {
+      const issues = (l.secondPass.issues || []).map((i) => (i.id === iss.id ? { ...i, resolved: true, resolution: note, resolvedBy: RT.meId, resolvedAt: new Date().toISOString() } : i));
+      await patch("letters/" + l.id, { secondPass: { ...l.secondPass, issues } });
+      await appendAudit("secondpass.resolved", "letter", l.id, `Resolved second-pass issue: ${iss.problem}`, { issueId: iss.id, resolution: note });
+    });
+  }
+  async function finish() {
+    await act("Finishing review", async () => {
+      await patch("letters/" + l.id, { status: "approved", reviewedBy: RT.meId, reviewedAt: new Date().toISOString() });
+      await appendAudit("letter.reviewed", "letter", l.id, `Finished review of ${lpName(l.lpId)} side letter: ${terms.filter((t) => t.status === "approved").length} approved terms`, { approved: terms.filter((t) => t.status === "approved").map((t) => t.id) });
+      toast("ok", "Review finished."); go("#letter-" + l.id);
+    });
+  }
+  async function doRetry() {
+    setRetry([]);
+    await act("Extracting", async () => { try { await runExtraction(l.id, { onStep: (k, st, t) => setRetry((xs) => [...(xs || []).filter((x) => x.k !== k), { k, st, t }]) }); } catch {} });
+  }
+  return html`<section class="view wide">
+    <a class="back" href="#review">← Review queue</a>
+    <div class="view-h"><div><h1>Review: ${lpName(l.lpId)}</h1><p class="muted">${l.title} · signed ${fmtDate(l.signedDate)} · ${l.vehicle} · <a href=${"#letter-" + l.id}>letter and original</a></p></div>
+      <div class="row"><${StatusPill} status=${l.status} /><button class="btn primary" disabled=${!canFinish || s.readOnly} onClick=${finish}>Finish review</button></div></div>
+
+    <div class="checklist card">
+      <div class=${drafts.length ? "todo" : "done"}><span class="dot"></span>${drafts.length ? `${drafts.length} draft ${drafts.length === 1 ? "term needs" : "terms need"} approval or rejection` : "Every term approved or rejected"}</div>
+      <div class=${cov.unaccounted.length ? "todo" : "done"}><span class="dot"></span>${l.source === "manual" ? "No letter text (entered by hand)" : cov.unaccounted.length ? `${cov.unaccounted.length === 1 ? "Paragraph" : "Paragraphs"} ${cov.unaccounted.join(", ")} not linked to a term or marked "no obligation"` : "Every paragraph accounted for"}</div>
+      <div class=${openIssues.length ? "todo" : "done"}><span class="dot"></span>${openIssues.length ? `${openIssues.length} second-pass ${openIssues.length === 1 ? "issue" : "issues"} open` : l.secondPass ? "Second-pass issues resolved" : "No second-pass check on record"}</div>
+    </div>
+
+    ${l.status === "failed" ? html`<div class="note bad">Extraction failed: ${l.extraction?.error || "unknown error"}.
+      <div class="row">${l.paragraphs?.length && RT.sample ? html`<button class="btn" onClick=${doRetry} disabled=${s.readOnly}>Retry with ${s.config?.model?.pinned}</button>` : null}
+      <button class="btn" onClick=${() => setAdding({})} disabled=${s.readOnly}>Enter terms by hand</button></div></div>` : null}
+    ${retry ? html`<ol class="steps card">${retry.map((x) => html`<li class=${"step " + x.st}><span class="dot"></span>${x.t}</li>`)}</ol>` : null}
+
+    ${lflags.length ? html`<div class="card"><h3>Letter-level flags</h3>
+      ${lflags.filter((f) => f.type === "coverage").map((f) => html`<div class="issue"><div><${Pill} kind="warn">Coverage<//> <span class="muted small">¶ ${f.paragraph}</span></div><${Clause} text=${l.paragraphs[f.paragraph - 1]} n=${f.paragraph} />
+        <div class="row"><button class="btn" disabled=${s.readOnly} onClick=${() => setAdding({ paragraphs: [f.paragraph], quote: l.paragraphs[f.paragraph - 1] })}>Add a term for ¶ ${f.paragraph}</button><button class="btn ghost" disabled=${s.readOnly} onClick=${() => setNoObligation(f.paragraph, true)}>Mark "no obligation"</button></div></div>`)}
+      ${openIssues.filter((i) => !i.termId).map((iss) => html`<${IssueResolver} key=${iss.id} iss=${iss} onResolve=${resolveIssue} disabled=${s.readOnly} />`)}
+    </div>` : null}
+
+    <div class="review-grid">
+      <div class="card doc">
+        <h3>Letter text</h3>
+        ${l.source === "manual" ? html`<p class="muted">Entered by hand: no stored letter.</p>` : html`<ol class="paras">${(l.paragraphs || []).map((p, i) => { const row = cov.rows[i]; return html`<li class=${"para p-" + row.state}>
+          <span class="pn">¶ ${i + 1}</span><div><p>${p}</p><div class="small row">
+            ${row.state === "term" ? html`<span class="muted">${row.termIds.map((tid) => catName(s.terms.find((t) => t.id === tid)?.category)).join(", ")}</span>` : row.state === "none" ? html`<span class="muted">No obligation</span> <button class="linkbtn" disabled=${s.readOnly} onClick=${() => setNoObligation(i + 1, false)}>undo</button>` : html`<${Pill} kind="warn">Not linked<//>`}
+            ${!s.readOnly ? html`<button class="linkbtn" onClick=${() => setAdding({ paragraphs: [i + 1], quote: p })}>+ term from ¶ ${i + 1}</button>` : null}
+          </div></div></li>`; })}</ol>`}
+      </div>
+      <div class="stack">
+        <div class="row"><h3>${terms.length} terms</h3><button class="btn small" disabled=${s.readOnly} onClick=${() => setAdding({})}>Add a term by hand</button></div>
+        ${adding ? html`<${TermEditor} key=${"new-" + C.canon(adding)} letter=${l} isNew=${true} seed=${adding} onDone=${() => setAdding(null)} />` : null}
+        ${sorted.map((t) => html`<${TermEditor} key=${t.id} t=${t} letter=${l} />`)}
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ---------------- MFN ---------------- */
+function itemEligibility(elector, grantee, terms, bundle) {
+  const rows = terms.map((t) => C.mfnEligibility(elector, grantee, t, bundle));
+  if (!bundle || !bundle.allOrNothing) return rows[0];
+  const bad = rows.findIndex((r) => r.status === "not_eligible");
+  if (bad >= 0) return { status: "not_eligible", reasons: [`Bundle includes "${terms[bad].summary}": ${rows[bad].reasons[0]}`, "All-or-nothing bundle, so none of it can be elected"] };
+  if (rows.some((r) => r.status === "review")) return { status: "review", reasons: [...new Set(rows.flatMap((r) => r.reasons))] };
+  return { status: "eligible", reasons: [...new Set(rows.flatMap((r) => r.reasons))] };
+}
+/* Builds the offer list for one LP from every approved, live term held by other LPs. Every electable term ends up either included or listed with the reason it was left out. */
+function buildPackage(elector, s) {
+  const lpById = Object.fromEntries(s.lps.map((l) => [l.id, l]));
+  const live = s.terms.filter((t) => t.status === "approved" && t.lpId !== elector.id);
+  const done = new Set(); const items = []; const notIncluded = [];
+  let considered = 0;
+  for (const t of live) {
+    if (done.has(t.id)) continue;
+    const bundle = t.bundleId ? s.bundles.find((b) => b.id === t.bundleId) : null;
+    const group = bundle && bundle.allOrNothing ? s.terms.filter((x) => bundle.termIds.includes(x.id) && x.status === "approved") : [t];
+    group.forEach((x) => done.add(x.id));
+    if (!group.some((x) => x.mfnStatus === "electable")) continue; // excluded terms are not offered; they are listed on the term itself
+    considered++;
+    const grantee = lpById[t.lpId];
+    const el = itemEligibility(elector, grantee, group, bundle && bundle.allOrNothing ? bundle : null);
+    const snapshot = group.map((x) => ({ termId: x.id, lpName: lpById[x.lpId]?.name || "", category: catName(x.category), summary: x.summary, quote: x.quote, conditions: x.conditions, expiry: x.expiry }));
+    const item = { key: bundle && bundle.allOrNothing ? "b:" + bundle.id : "t:" + t.id, kind: bundle && bundle.allOrNothing ? "bundle" : "term", termIds: group.map((x) => x.id), bundleId: bundle?.id || null, bundleName: bundle?.name || null, allOrNothing: !!bundle?.allOrNothing, eligibility: el.status, reasons: el.reasons, snapshot, decision: el.status === "eligible" ? "include" : null, decisionNote: "" };
+    if (el.status === "not_eligible") notIncluded.push({ key: item.key, termIds: item.termIds, label: bundle && bundle.allOrNothing ? `Bundle: ${bundle.name} (${grantee?.name})` : `${catName(t.category)}: ${t.summary} (${grantee?.name})`, reasons: el.reasons });
+    else items.push(item);
+  }
+  return { items, notIncluded, considered };
+}
+const itemsHash = (items) => C.sha256Text(C.canon(items.map(({ key, termIds, snapshot, decision }) => ({ key, termIds, snapshot, decision }))));
+
+function MfnView({ sub }) {
+  return html`<section class="view">
+    <div class="view-h"><h1>MFN</h1></div>
+    <nav class="subnav"><a class=${!sub ? "on" : ""} href="#mfn">Check a proposed term</a><a class=${sub === "packages" ? "on" : ""} href="#mfn-packages">Election packages</a><a class=${sub === "records" ? "on" : ""} href="#mfn-records">Election records</a></nav>
+    ${!sub ? html`<${ProposedCheck} />` : sub === "packages" ? html`<${Packages} />` : html`<${Records} />`}
+  </section>`;
+}
+
+function EligTable({ rows }) {
+  return html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Commitment</th><th>MFN setup</th><th>Result</th><th>Why</th></tr></thead><tbody>
+    ${rows.map((r) => html`<tr key=${r.lp.id}><td>${r.lp.name}</td><td class="num">${C.usd(r.lp.commitmentUsd)}</td><td class="small">${mfnSummary(r.lp)}</td>
+      <td>${r.status === "eligible" ? html`<${Pill} kind="bad">Could elect<//>` : r.status === "review" ? html`<${Pill} kind="warn">Needs a decision<//>` : html`<${Pill} kind="neutral">Not eligible<//>`}</td>
+      <td class="small">${r.reasons.join(". ")}</td></tr>`)}
+  </tbody></table></div>`;
+}
+function mfnSummary(lp) {
+  const m = lp.mfn || {};
+  if (!m.hasMfn) return "No MFN";
+  const base = m.basis === "all" ? "All terms" : m.basis === "manual" ? "Case by case" : `Size-based, limit ${C.usd(m.thresholdUsd ?? lp.commitmentUsd)}`;
+  const ex = (m.excludedCategories || []).map(catName);
+  return base + (ex.length ? `; excludes ${ex.join(", ")}` : "");
+}
+
+function ProposedCheck() {
+  const s = useStore();
+  const [recv, setRecv] = useState("");
+  const [nl, setNl] = useState({ name: "", commitment: "" });
+  const [form, setForm] = useState({ category: "fees", text: "", mfnStatus: "electable", mfnReason: "", bundleId: "" });
+  const [res, setRes] = useState(null);
+  const receiving = recv === "new" ? { id: "proposed-lp", name: nl.name || "New LP", commitmentUsd: Number(nl.commitment) * 1e6 } : s.lps.find((l) => l.id === recv);
+  const bundles = receiving ? s.bundles.filter((b) => b.lpId === receiving.id) : [];
+  async function check() {
+    const proposed = { id: "proposed", category: form.category, summary: form.text, mfnStatus: form.mfnStatus, mfnReason: form.mfnReason || "Proposed" };
+    const bundle = form.bundleId ? s.bundles.find((b) => b.id === form.bundleId) : null;
+    const group = bundle ? [...s.terms.filter((t) => bundle.termIds.includes(t.id) && C.isLive(t)), proposed] : [proposed];
+    const rows = s.lps.filter((l) => l.id !== receiving.id).map((lp) => ({ lp, ...itemEligibility(lp, receiving, group, bundle && bundle.allOrNothing ? bundle : null) }))
+      .sort((a, b) => ["eligible", "review", "not_eligible"].indexOf(a.status) - ["eligible", "review", "not_eligible"].indexOf(b.status));
+    const approved = s.terms.filter((t) => t.status === "approved");
+    setRes({ rows, bundle, group, similar: null, simState: RT.sample ? "run" : "off" });
+    let similar = approved.filter((t) => t.category === form.category).map((t) => ({ t, why: "Same category" }));
+    if (RT.sample) {
+      try {
+        const prompt = `A private infrastructure fund is about to offer this term to an LP: "${form.text}" (category ${catName(form.category)}).
+List up to 8 terms already granted to other LPs that are the same or similar in substance (same benefit, a weaker or stronger version, or the same subject). Most similar first.
+Granted terms (id | LP | category | summary):
+${approved.slice(0, 120).map((t) => `${t.id} | ${lpName(t.lpId)} | ${catName(t.category)} | ${t.summary}`).join("\n")}
+Reply with only JSON: {"similar":[{"termId":"<id>","why":"one short phrase"}]}`;
+        const r = await callModel(prompt);
+        const list = (Array.isArray(r.json?.similar) ? r.json.similar : []).map((x) => ({ t: approved.find((t) => t.id === x.termId), why: String(x.why || "") })).filter((x) => x.t);
+        similar = list; setRes((p) => ({ ...p, similar, simState: "done", model: r.model, modelApplied: r.modelApplied }));
+        return;
+      } catch (e) { setRes((p) => ({ ...p, similar, simState: "error", error: errText(e) })); return; }
+    }
+    setRes((p) => ({ ...p, similar }));
+  }
+  const can = receiving && (recv !== "new" || Number(nl.commitment) > 0) && form.text.trim().length > 5;
+  const counts = res ? { e: res.rows.filter((r) => r.status === "eligible").length, r: res.rows.filter((r) => r.status === "review").length } : null;
+  return html`<div class="stack">
+    <p class="muted">Before offering a term, see what similar terms you have already granted and which LPs could claim the new one through their MFN.</p>
+    <div class="card form">
+      <div class="grid2">
+        <${Field} label="LP receiving the term"><select id="pc-lp" value=${recv} onChange=${(e) => { setRecv(e.target.value); setForm({ ...form, bundleId: "" }); }}><option value="">Choose…</option>${s.lps.map((l) => html`<option value=${l.id}>${l.name} (${C.usd(l.commitmentUsd)})</option>`)}<option value="new">An LP not yet signed</option></select><//>
+        <${Field} label="Category"><select id="pc-cat" value=${form.category} onChange=${(e) => setForm({ ...form, category: e.target.value })}>${categoryList().map((c) => html`<option value=${c.id}>${c.name}</option>`)}</select><//>
+        ${recv === "new" ? html`<${Field} label="LP name"><input id="pc-nn" type="text" value=${nl.name} onInput=${(e) => setNl({ ...nl, name: e.target.value })} /><//><${Field} label="Expected commitment ($M)"><input id="pc-nc" type="number" value=${nl.commitment} onInput=${(e) => setNl({ ...nl, commitment: e.target.value })} /><//>` : null}
+        <${Field} label="The term you plan to offer" wide><textarea id="pc-text" rows="3" placeholder="e.g. Management fee reduced by 0.10% for commitments of $40M or more" value=${form.text} onInput=${(e) => setForm({ ...form, text: e.target.value })}></textarea><//>
+        <${Field} label="Would it be electable under MFN?"><${Seg} value=${form.mfnStatus} onChange=${(v) => setForm({ ...form, mfnStatus: v })} options=${[["electable", "Electable"], ["excluded", "Excluded"]]} /><//>
+        <${Field} label="Part of a bundle"><select id="pc-bnd" value=${form.bundleId} onChange=${(e) => setForm({ ...form, bundleId: e.target.value })}><option value="">No</option>${bundles.map((b) => html`<option value=${b.id}>${b.name}</option>`)}</select><//>
+      </div>
+      <div class="row end"><button class="btn primary" disabled=${!can} onClick=${check}>Check</button></div>
+    </div>
+    ${res ? html`<div class="card">
+      <h3>Who could claim it</h3>
+      <p>${counts.e ? html`<${Pill} kind="bad">${counts.e} ${counts.e === 1 ? "LP" : "LPs"} could elect this<//>` : html`<${Pill} kind="ok">No LP could elect this<//>`} ${counts.r ? html`<${Pill} kind="warn">${counts.r} need a decision<//>` : null}</p>
+      ${res.bundle ? html`<div class="bundle-box"><strong>Checked as part of "${res.bundle.name}"${res.bundle.allOrNothing ? " (all-or-nothing)" : ""}</strong><ul>${res.group.map((t) => html`<li><${Pill} kind="cat">${catName(t.category)}<//> ${t.summary}</li>`)}</ul></div>` : null}
+      <${EligTable} rows=${res.rows} />
+      <p class="small muted">This flags LPs that might be able to claim the term. A person or counsel makes the final call.</p>
+    </div>
+    <div class="card"><h3>Similar terms already granted</h3>
+      ${res.simState === "run" ? html`<p class="muted">Comparing with every approved term…</p>` : null}
+      ${res.simState === "error" ? html`<p class="note warn">Similarity check failed (${res.error}); showing every approved term in the same category.</p>` : null}
+      ${res.simState === "off" ? html`<p class="note">Claude is not available here; showing every approved term in the same category.</p>` : null}
+      ${res.similar ? (res.similar.length ? res.similar.map((x) => html`<${TermCard} key=${x.t.id} t=${x.t} extra=${html`<p class="small muted">Why it's similar: ${x.why}</p>`} />`) : html`<${Empty} title="Nothing similar on record" />`) : null}
+    </div>` : null}
+  </div>`;
+}
+
+function Packages() {
+  const s = useStore();
+  const withMfn = s.lps.filter((l) => l.mfn?.hasMfn);
+  async function generate(lps) {
+    await act("Generating packages", async () => {
+      for (const lp of lps) {
+        const existing = s.elections.find((e) => e.lpId === lp.id && e.status === "draft");
+        const signed = s.elections.find((e) => e.lpId === lp.id && e.status !== "draft");
+        if (signed) continue;
+        const pkg = buildPackage(lp, store.state);
+        const id = existing?.id || rid("el");
+        const doc = { lpId: lp.id, status: "draft", createdAt: new Date().toISOString(), createdBy: RT.meId, ...pkg, signoff: null, sentAt: null, choices: {} };
+        await put("elections/" + id, doc);
+        await appendAudit(existing ? "election.regenerated" : "election.generated", "election", id, `${existing ? "Regenerated" : "Generated"} MFN election package for ${lp.name}: ${pkg.items.length} items offered, ${pkg.notIncluded.length} not eligible, of ${pkg.considered} electable`, { items: pkg.items.map((i) => ({ key: i.key, eligibility: i.eligibility })), notIncluded: pkg.notIncluded.map((n) => n.key), hash: await itemsHash(pkg.items) });
+      }
+      toast("ok", "Packages generated. Each needs counsel sign-off before it is sent.");
+    });
+  }
+  const signedCount = s.elections.filter((e) => e.status !== "draft").length;
+  return html`<div class="stack">
+    <p class="muted">Usually done after the final close. Each package is built from the database: every approved, electable term held by other LPs is either offered or listed with the reason it isn't. All-or-nothing bundles are offered whole.</p>
+    <div class="row"><button class="btn primary" disabled=${s.readOnly || !withMfn.length} onClick=${() => generate(withMfn)}>Generate packages for ${withMfn.length} LPs with MFN</button>
+      ${signedCount ? html`<span class="small muted">${signedCount} signed-off packages are locked and won't be regenerated.</span>` : null}</div>
+    ${s.elections.length ? [...s.elections].sort((a, b) => lpName(a.lpId).localeCompare(lpName(b.lpId))).map((e) => html`<${PackageCard} key=${e.id} e=${e} />`) : html`<${Empty} title="No packages yet">Generate them when the fund is ready to run the MFN process.<//>`}
+  </div>`;
+}
+
+function PackageCard({ e }) {
+  const s = useStore();
+  const [open, setOpen] = useState(false);
+  const [hashNow, setHashNow] = useState(null);
+  const [sentDate, setSentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [choiceDate, setChoiceDate] = useState(new Date().toISOString().slice(0, 10));
+  const lp = s.lps.find((l) => l.id === e.lpId);
+  useEffect(() => { itemsHash(e.items || []).then(setHashNow); }, [C.canon(e.items || [])]);
+  const offered = (e.items || []).filter((i) => i.decision === "include");
+  const undecided = (e.items || []).filter((i) => !i.decision);
+  const locked = e.status !== "draft";
+  const stale = e.status === "draft" && lp ? buildPackage(lp, s) : null;
+  const changedSince = stale && (C.canon(stale.items.map((i) => [i.key, i.termIds, i.snapshot])) !== C.canon((e.items || []).map((i) => [i.key, i.termIds, i.snapshot])));
+  async function decide(key, decision) {
+    await act("Saving decision", async () => {
+      const items = e.items.map((i) => (i.key === key ? { ...i, decision } : i));
+      await patch("elections/" + e.id, { items });
+      await appendAudit("election.decision", "election", e.id, `${decision === "include" ? "Included" : "Left out"} ${key} in ${lp?.name}'s package`, { key, decision });
+    });
+  }
+  async function signoff() {
+    await act("Signing off", async () => {
+      const hash = await itemsHash(e.items);
+      await patch("elections/" + e.id, { status: "signed_off", signoff: { by: RT.meId, at: new Date().toISOString(), hash } });
+      await appendAudit("election.signed_off", "election", e.id, `Counsel signed off ${lp?.name}'s election package (${offered.length} items)`, { hash, items: offered.map((i) => i.key) });
+      toast("ok", "Signed off. The package is now locked.");
+    });
+  }
+  async function markSent() {
+    await act("Recording", async () => {
+      await patch("elections/" + e.id, { status: "sent", sentAt: sentDate });
+      await appendAudit("election.sent", "election", e.id, `Recorded ${lp?.name}'s package as sent on ${sentDate}`, { sentAt: sentDate });
+    });
+  }
+  async function record(key, choice) {
+    await act("Recording choice", async () => {
+      const choices = { ...(e.choices || {}), [key]: { choice, date: choiceDate, by: RT.meId, at: new Date().toISOString() } };
+      const all = offered.every((i) => choices[i.key]);
+      await patch("elections/" + e.id, { choices, status: all ? "responded" : e.status });
+      await appendAudit("election.choice", "election", e.id, `${lp?.name} ${choice} ${key} (dated ${choiceDate})`, { key, choice, date: choiceDate });
+    });
+  }
+  const stPill = { draft: ["warn", "Draft"], signed_off: ["info", "Signed off by counsel"], sent: ["info", "Sent"], responded: ["ok", "Elections recorded"] }[e.status] || ["neutral", e.status];
+  const intact = !e.signoff || hashNow === e.signoff.hash;
+  return html`<article class="card pkg">
+    <header class="pkg-h"><div><h3>${lp?.name || "Unknown LP"}</h3><p class="small muted">${mfnSummary(lp || {})} · generated ${fmtTime(e.createdAt)}</p></div>
+      <div class="row"><${Pill} kind=${stPill[0]}>${stPill[1]}<//>${e.signoff ? (intact ? html`<${Pill} kind="ok">Unchanged since sign-off<//>` : html`<${Pill} kind="bad">Changed after sign-off<//>`) : null}</div></header>
+    <p class="small"><strong class="num">${e.considered}</strong> electable items held by other LPs considered: <strong class="num">${offered.length}</strong> offered, <strong class="num">${undecided.length}</strong> awaiting a decision, <strong class="num">${(e.items || []).filter((i) => i.decision === "exclude").length + (e.notIncluded || []).length}</strong> not offered (reasons below).</p>
+    ${changedSince ? html`<p class="note warn">Approved terms have changed since this draft was generated. Regenerate before sign-off.</p>` : null}
+    <button class="linkbtn" onClick=${() => setOpen(!open)}>${open ? "Hide details" : "Show items"}</button>
+    ${open ? html`<div class="stack">
+      ${(e.items || []).map((i) => html`<div class=${"pitem " + (i.decision || "undecided")}>
+        <div class="row"><strong>${i.kind === "bundle" ? `Bundle: ${i.bundleName}` : i.snapshot[0].category}</strong> <span class="muted small">from ${i.snapshot[0].lpName}</span>
+          ${i.allOrNothing ? html`<${Pill} kind="warn">all-or-nothing<//>` : null}
+          ${i.eligibility === "review" ? html`<${Pill} kind="warn">Needs a decision<//>` : null}
+          ${e.choices?.[i.key] ? html`<${Pill} kind=${e.choices[i.key].choice === "elected" ? "ok" : "neutral"}>${e.choices[i.key].choice} ${fmtDate(e.choices[i.key].date)}<//>` : null}</div>
+        <ul>${i.snapshot.map((x) => html`<li>${x.summary}${x.conditions && x.conditions !== "None" ? html` <span class="muted small">(Conditions: ${x.conditions})</span>` : null}</li>`)}</ul>
+        <p class="small muted">${i.reasons.join(". ")}</p>
+        ${!locked && i.eligibility === "review" && !s.readOnly ? html`<div class="row"><button class=${"btn small" + (i.decision === "include" ? " primary" : "")} onClick=${() => decide(i.key, "include")}>Offer it</button><button class=${"btn small" + (i.decision === "exclude" ? " primary" : "")} onClick=${() => decide(i.key, "exclude")}>Don't offer</button></div>` : null}
+        ${e.status === "sent" || e.status === "responded" ? (i.decision === "include" && !s.readOnly ? html`<div class="row"><button class="btn small" onClick=${() => record(i.key, "elected")}>LP elected</button><button class="btn small" onClick=${() => record(i.key, "declined")}>LP declined</button></div>` : null) : null}
+      </div>`)}
+      ${(e.notIncluded || []).length ? html`<details><summary>${e.notIncluded.length} not eligible, with reasons</summary><ul class="small">${e.notIncluded.map((n) => html`<li><strong>${n.label}</strong>: ${n.reasons.join(". ")}</li>`)}</ul></details>` : null}
+    </div>` : null}
+    <div class="row pkg-actions">
+      ${e.status === "draft" ? html`<button class="btn primary" disabled=${s.readOnly || undecided.length > 0 || changedSince} onClick=${signoff}>Sign off as counsel</button>${undecided.length ? html`<span class="small muted">Decide the ${undecided.length} open ${undecided.length === 1 ? "item" : "items"} first.</span>` : null}` : null}
+      ${e.status === "signed_off" ? html`<span class="small">Signed off by ${nameOf(e.signoff.by)}, ${fmtTime(e.signoff.at)}</span><input id=${"sent-" + e.id} type="date" value=${sentDate} onInput=${(x) => setSentDate(x.target.value)} /><button class="btn" disabled=${s.readOnly} onClick=${markSent}>Record as sent</button>` : null}
+      ${e.status === "sent" || e.status === "responded" ? html`<span class="small">Sent ${fmtDate(e.sentAt)}. Choice date:</span><input id=${"cd-" + e.id} type="date" value=${choiceDate} onInput=${(x) => setChoiceDate(x.target.value)} />` : null}
+      ${e.signoff ? html`<code class="hash small">${short(e.signoff.hash)}</code>` : null}
+    </div>
+  </article>`;
+}
+
+function Records() {
+  const s = useStore();
+  const rows = s.elections.flatMap((e) => Object.entries(e.choices || {}).map(([key, c]) => ({ e, key, c, item: (e.items || []).find((i) => i.key === key) }))).sort((a, b) => (a.c.at < b.c.at ? 1 : -1));
+  return html`<div class="stack">
+    <p class="muted">Every LP choice recorded from a signed-off package, with the date on the LP's election and who recorded it.</p>
+    ${rows.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Item</th><th>Choice</th><th>Dated</th><th>Recorded by</th></tr></thead><tbody>
+      ${rows.map((r) => html`<tr><td>${lpName(r.e.lpId)}</td><td>${r.item ? (r.item.kind === "bundle" ? "Bundle: " + r.item.bundleName : r.item.snapshot[0].summary) : r.key}<div class="small muted">from ${r.item?.snapshot?.[0]?.lpName || ""}</div></td>
+        <td><${Pill} kind=${r.c.choice === "elected" ? "ok" : "neutral"}>${r.c.choice}<//></td><td class="num">${fmtDate(r.c.date)}</td><td>${nameOf(r.c.by)}<div class="small muted">${fmtTime(r.c.at)}</div></td></tr>`)}
+    </tbody></table></div>` : html`<${Empty} title="No elections recorded yet">Choices appear here once a signed-off package is sent and the LP responds.<//>`}
+  </div>`;
+}
+
+/* ---------------- LPs ---------------- */
+function LpsView() {
+  const s = useStore();
+  const [edit, setEdit] = useState(null);
+  const [editB, setEditB] = useState(null);
+  async function saveLp() {
+    await act("Saving LP", async () => {
+      const before = s.lps.find((l) => l.id === edit.id);
+      const doc = { name: edit.name.trim(), type: edit.type, commitmentUsd: Math.round(Number(edit.commitmentM) * 1e6), vehicle: edit.vehicle, close: edit.close,
+        mfn: { hasMfn: edit.hasMfn, basis: edit.basis, thresholdUsd: edit.thresholdM === "" || edit.thresholdM == null ? null : Math.round(Number(edit.thresholdM) * 1e6), excludedCategories: edit.excludedCategories, excludedTermIds: before?.mfn?.excludedTermIds || [], note: edit.note } };
+      await put("lps/" + edit.id, doc);
+      await appendAudit("lp.updated", "lp", edit.id, `Updated LP ${doc.name} and its MFN setup`, { before: before ? { commitmentUsd: before.commitmentUsd, mfn: before.mfn, type: before.type } : null, after: { commitmentUsd: doc.commitmentUsd, mfn: doc.mfn, type: doc.type } });
+      setEdit(null); toast("ok", "LP saved.");
+    });
+  }
+  async function saveBundle() {
+    await act("Saving bundle", async () => {
+      const before = s.bundles.find((b) => b.id === editB.id);
+      await patch("bundles/" + editB.id, { name: editB.name, allOrNothing: editB.allOrNothing, note: editB.note });
+      await appendAudit("bundle.updated", "bundle", editB.id, `Updated bundle "${editB.name}"`, { before: { name: before.name, allOrNothing: before.allOrNothing, note: before.note }, after: { name: editB.name, allOrNothing: editB.allOrNothing, note: editB.note } });
+      setEditB(null);
+    });
+  }
+  const startEdit = (l) => setEdit({ id: l.id, name: l.name, type: l.type, commitmentM: l.commitmentUsd / 1e6, vehicle: l.vehicle, close: l.close || "", hasMfn: !!l.mfn?.hasMfn, basis: l.mfn?.basis || "size", thresholdM: l.mfn?.thresholdUsd != null ? l.mfn.thresholdUsd / 1e6 : "", excludedCategories: l.mfn?.excludedCategories || [], note: l.mfn?.note || "" });
+  const total = s.lps.reduce((a, l) => a + (l.commitmentUsd || 0), 0);
+  return html`<section class="view">
+    <div class="view-h"><div><h1>LPs</h1><p class="muted">${s.lps.length} LPs · ${C.usd(total)} committed. Each LP keeps its own MFN rules; nothing is hard-coded.</p></div>
+      <button class="btn" disabled=${s.readOnly} onClick=${() => setEdit({ id: rid("lp"), name: "", type: "public_pension", commitmentM: "", vehicle: (s.config?.vehicles || [])[0] || "", close: "", hasMfn: true, basis: "size", thresholdM: "", excludedCategories: [], note: "", isNew: true })}>Add an LP</button></div>
+    ${edit ? html`<div class="card form"><h3>${edit.isNew ? "New LP" : "Edit " + edit.name}</h3>
+      <div class="grid2">
+        <${Field} label="Name"><input id="lp-name" type="text" value=${edit.name} onInput=${(e) => setEdit({ ...edit, name: e.target.value })} /><//>
+        <${Field} label="Type"><select id="lp-type" value=${edit.type} onChange=${(e) => setEdit({ ...edit, type: e.target.value })}>${Object.entries(LP_TYPES).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select><//>
+        <${Field} label="Commitment ($M)"><input id="lp-commit" type="number" value=${edit.commitmentM} onInput=${(e) => setEdit({ ...edit, commitmentM: e.target.value })} /><//>
+        <${Field} label="Vehicle"><select id="lp-veh" value=${edit.vehicle} onChange=${(e) => setEdit({ ...edit, vehicle: e.target.value })}>${(s.config?.vehicles || []).map((v) => html`<option value=${v}>${v}</option>`)}</select><//>
+        <${Field} label="Closing"><input id="lp-close" type="text" value=${edit.close} onInput=${(e) => setEdit({ ...edit, close: e.target.value })} /><//>
+        <${Field} label="Has an MFN clause"><${Seg} value=${edit.hasMfn} onChange=${(v) => setEdit({ ...edit, hasMfn: v })} options=${[[true, "Yes"], [false, "No"]]} /><//>
+        ${edit.hasMfn ? html`
+          <${Field} label="MFN basis" wide><${Seg} value=${edit.basis} onChange=${(v) => setEdit({ ...edit, basis: v })} options=${[["size", "Terms from LPs at or below a commitment limit"], ["all", "All LPs' terms"], ["manual", "Case by case"]]} /><//>
+          ${edit.basis === "size" ? html`<${Field} label="Commitment limit ($M)" hint="Blank = this LP's own commitment"><input id="lp-thr" type="number" value=${edit.thresholdM} onInput=${(e) => setEdit({ ...edit, thresholdM: e.target.value })} /><//>` : null}
+          <${Field} label="Categories excluded from this LP's MFN" wide><${Toggles} values=${edit.excludedCategories} options=${categoryList().map((c) => [c.id, c.name])} onChange=${(v) => setEdit({ ...edit, excludedCategories: v })} /><//>
+          <${Field} label="Notes on unusual MFN terms" wide><input id="lp-note" type="text" value=${edit.note} onInput=${(e) => setEdit({ ...edit, note: e.target.value })} /><//>` : null}
+      </div>
+      <div class="row end"><button class="btn ghost" onClick=${() => setEdit(null)}>Cancel</button><button class="btn primary" disabled=${!edit.name.trim() || !(Number(edit.commitmentM) > 0)} onClick=${saveLp}>Save</button></div></div>` : null}
+    <div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Type</th><th>Commitment</th><th>Vehicle</th><th>Closing</th><th>MFN setup</th><th>Terms</th><th></th></tr></thead><tbody>
+      ${[...s.lps].sort((a, b) => b.commitmentUsd - a.commitmentUsd).map((l) => html`<tr key=${l.id}><td>${l.name}${l.mfn?.note ? html`<div class="small muted">${l.mfn.note}</div>` : null}</td><td>${LP_TYPES[l.type] || l.type}</td><td class="num">${C.usd(l.commitmentUsd)}</td><td>${l.vehicle}</td><td>${l.close}</td>
+        <td class="small">${mfnSummary(l)}</td><td class="num">${s.terms.filter((t) => t.lpId === l.id && t.status === "approved").length}</td><td><button class="btn small" disabled=${s.readOnly} onClick=${() => startEdit(l)}>Edit</button></td></tr>`)}
+    </tbody></table></div>
+    <h2>Bundles</h2>
+    <p class="muted">Terms granted together, or benefits tied to conditions. All-or-nothing bundles are offered whole in MFN packages.</p>
+    <div class="stack">${s.bundles.map((b) => html`<div class="card bundle-card" key=${b.id}>
+      ${editB?.id === b.id ? html`<div class="grid2"><${Field} label="Name"><input id=${"bn-" + b.id} type="text" value=${editB.name} onInput=${(e) => setEditB({ ...editB, name: e.target.value })} /><//>
+        <label class="check"><input id=${"ba-" + b.id} type="checkbox" checked=${editB.allOrNothing} onChange=${(e) => setEditB({ ...editB, allOrNothing: e.target.checked })} /> All-or-nothing</label>
+        <${Field} label="Why these go together" wide><input id=${"bt-" + b.id} type="text" value=${editB.note} onInput=${(e) => setEditB({ ...editB, note: e.target.value })} /><//></div>
+        <div class="row end"><button class="btn ghost" onClick=${() => setEditB(null)}>Cancel</button><button class="btn primary" onClick=${saveBundle}>Save</button></div>`
+      : html`<div class="row"><strong>${b.name}</strong> <span class="muted">· ${lpName(b.lpId)}</span> ${b.allOrNothing ? html`<${Pill} kind="warn">all-or-nothing<//>` : html`<${Pill} kind="neutral">separable<//>`}<button class="btn small ghost" disabled=${s.readOnly} onClick=${() => setEditB({ id: b.id, name: b.name, allOrNothing: b.allOrNothing, note: b.note || "" })}>Edit</button></div>
+        ${b.note ? html`<p class="small muted">${b.note}</p>` : null}
+        <ul>${b.termIds.map((id) => s.terms.find((t) => t.id === id)).filter(Boolean).map((t) => html`<li><${Pill} kind="cat">${catName(t.category)}<//> ${t.summary} ${t.status !== "approved" ? html`<${StatusPill} status=${t.status} />` : null}</li>`)}</ul>`}
+    </div>`)}</div>
+  </section>`;
+}
+
+/* ===== UI part 3: quality (monitoring, test set, model pin), audit log, settings, app shell ===== */
+
+/* ---------- test set runs ---------- */
+async function runTestSet(model, purpose) {
+  const s = store.state; const cases = [...s.tests].sort((a, b) => a.name.localeCompare(b.name));
+  if (!cases.length) { toast("bad", "The test set is empty."); return; }
+  if (!RT.sample) { toast("bad", "Claude is not available in this view, so the test set can't run."); return; }
+  const runId = rid("run"); const at = new Date().toISOString();
+  const ok = await act("Starting test run", async () => {
+    await put("testRuns/" + runId, { model, promptVersion: C.PROMPT_VERSIONS.extract, at, by: RT.meId, status: "running", purpose, total: cases.length, cases: [] });
+    return true;
+  });
+  if (!ok) return;
+  store.set({ testRun: { id: runId, model, done: 0, total: cases.length, current: cases[0].name } });
+  const results = [];
+  for (const tc of cases) {
+    store.set((st) => ({ testRun: { ...st.testRun, current: tc.name } }));
+    try {
+      const ex = await extractTerms(tc.paragraphs, { lpName: tc.lpName, lpType: tc.lpType, vehicle: tc.vehicle }, { model });
+      const sc = C.scoreCase(tc.expected, ex.terms);
+      const quoteFails = ex.terms.filter((t) => C.quoteCheck(t.quote, tc.paragraphs).status !== "pass").length;
+      const cov = C.coverage({ id: "x", paragraphs: tc.paragraphs, noObligation: ex.noObligation }, ex.terms.map((t, i) => ({ ...t, id: "x" + i, letterId: "x", status: "draft" })));
+      results.push({ caseId: tc.id, name: tc.name, modelApplied: ex.modelApplied, correct: sc.correct, total: sc.total, extracted: ex.terms.length, extra: sc.extra.length, quoteFails, unaccounted: cov.unaccounted,
+        rows: sc.rows.map((r) => ({ result: r.result, category: r.expected.category, quote: r.expected.quote.slice(0, 90), wrong: r.wrong || [] })) });
+    } catch (e) { results.push({ caseId: tc.id, name: tc.name, error: errText(e), correct: 0, total: tc.expected.length, extracted: 0, extra: 0, quoteFails: 0, unaccounted: [] }); }
+    store.set((st) => ({ testRun: { ...st.testRun, done: results.length } }));
+    try { await patch("testRuns/" + runId, { cases: results }); } catch {}
+  }
+  const correct = results.reduce((a, r) => a + r.correct, 0), total = results.reduce((a, r) => a + r.total, 0), extracted = results.reduce((a, r) => a + r.extracted, 0);
+  const errors = results.filter((r) => r.error).length;
+  const mismatch = results.filter((r) => !r.error && r.modelApplied !== model).length;
+  const status = errors || mismatch ? "incomplete" : "complete";
+  const accuracy = total ? correct / total : 0, precision = extracted ? correct / extracted : 0;
+  const reason = errors ? `${errors} case${errors === 1 ? "" : "s"} failed to run` : mismatch ? `${mismatch} case${mismatch === 1 ? " was" : "s were"} answered by a model other than ${model}` : null;
+  await act("Saving test run", async () => {
+    await patch("testRuns/" + runId, { status, accuracy, precision, correct, totalExpected: total, extracted, finishedAt: new Date().toISOString(), reason });
+    await appendAudit("testset.run", "testRun", runId, `Test set run with ${model}: ${correct} of ${total} expected terms fully correct (${C.pct(accuracy)})${reason ? "; " + reason : ""}`, { model, promptVersion: C.PROMPT_VERSIONS.extract, accuracy, precision, status, purpose });
+  });
+  store.set({ testRun: null });
+  toast(status === "complete" ? "ok" : "bad", status === "complete" ? `Test run finished: ${C.pct(accuracy)} accurate.` : `Test run incomplete: ${reason}.`);
+}
+
+function MetricCard({ label, value, sub, state, href }) {
+  return html`<a class=${"metric " + (state || "")} href=${href || "#quality"}><span class="mlabel">${label}</span><span class="mvalue num">${value}</span>${sub ? html`<span class="msub">${sub}</span>` : null}</a>`;
+}
+
+function QualityView() {
+  const s = useStore();
+  const m = C.metrics(s); const alerts = C.alertsFrom(m, s.baseline);
+  const [cand, setCand] = useState("");
+  const [openRun, setOpenRun] = useState(null);
+  const [addLetter, setAddLetter] = useState("");
+  const pinned = s.config?.model?.pinned;
+  const runs = [...s.testRuns].sort((a, b) => (a.at < b.at ? 1 : -1));
+  const latestFor = (model) => runs.find((r) => r.model === model && r.status === "complete" && r.promptVersion === C.PROMPT_VERSIONS.extract);
+  const curRun = latestFor(pinned); const candRun = cand.trim() ? latestFor(cand.trim()) : null;
+  const bar = curRun ? curRun.accuracy : 0.9;
+  const canSwitch = candRun && cand.trim() !== pinned && candRun.accuracy >= bar;
+  const integ = Object.values(s.integrity); const integBad = integ.filter((x) => x.status === "mismatch" || x.status === "error").length;
+  const reviewable = s.letters.filter((l) => l.status === "approved" && !s.tests.some((t) => t.sourceLetterId === l.id));
+
+  async function acknowledge() {
+    await act("Acknowledging", async () => {
+      const b = { failed: m.failed, flagged: m.flagged, unclear: m.unclear, accuracy: m.accuracy, modelFallbacks: m.modelFallbacks, ackAt: new Date().toISOString(), ackBy: RT.meId };
+      await put("monitor/baseline", b);
+      await appendAudit("alerts.acknowledged", "monitor", "baseline", `Acknowledged alerts; new baseline ${m.failed} failed, ${m.flagged} flagged, ${m.unclear} unclear, accuracy ${C.pct(m.accuracy)}`, { before: s.baseline, after: b, alerts: alerts.map((a) => a.message) });
+      toast("ok", "Alerts acknowledged.");
+    });
+  }
+  async function switchModel() {
+    await act("Switching model", async () => {
+      const old = s.config.model; const next = cand.trim();
+      const model = { pinned: next, pinnedAt: new Date().toISOString(), pinnedBy: RT.meId, approvedRunId: candRun.id, history: [...(old.history || []), { model: old.pinned, from: old.pinnedAt, to: new Date().toISOString(), lastRunAccuracy: curRun?.accuracy ?? null }] };
+      await patch("config/main", { model });
+      await appendAudit("model.switched", "config", "main", `Switched pinned model from ${old.pinned} to ${next} after a test run scored ${C.pct(candRun.accuracy)} (bar ${C.pct(bar)})`, { from: old.pinned, to: next, candidateRun: candRun.id, candidateAccuracy: candRun.accuracy, previousAccuracy: curRun?.accuracy ?? null });
+      setCand(""); toast("ok", `Pinned model is now ${next}.`);
+    });
+  }
+  async function addCase() {
+    const l = s.letters.find((x) => x.id === addLetter); const lp = s.lps.find((x) => x.id === l.lpId);
+    const terms = s.terms.filter((t) => t.letterId === l.id && t.status === "approved");
+    await act("Adding test case", async () => {
+      const id = "tc-" + l.id.slice(3);
+      await put("tests/" + id, { name: lp.name, lpName: lp.name, lpType: lp.type, vehicle: l.vehicle, paragraphs: l.paragraphs, expected: terms.map((t) => ({ category: t.category, quote: t.quote, mfnStatus: t.mfnStatus, lpStatusBased: t.lpStatusBased })), expectedNoObligation: l.noObligation || [], sourceLetterId: l.id, createdAt: new Date().toISOString(), createdBy: RT.meId });
+      await appendAudit("testset.case_added", "test", id, `Added ${lp.name} letter to the test set (${terms.length} expected terms)`, { sourceLetterId: l.id });
+      setAddLetter("");
+    });
+  }
+  async function removeCase(tc) {
+    await act("Removing test case", async () => {
+      await RT.db.doc("tests/" + tc.id).delete();
+      await appendAudit("testset.case_removed", "test", tc.id, `Removed ${tc.name} from the test set`, { expected: tc.expected.length });
+    });
+  }
+  const tr = s.testRun;
+  return html`<section class="view">
+    <div class="view-h"><h1>Quality</h1></div>
+    <h2>Monitoring</h2>
+    <div class="metrics">
+      <${MetricCard} label="Failed extractions" value=${m.failed} state=${m.failed ? "bad" : "ok"} href="#review" sub="Letters Claude could not read" />
+      <${MetricCard} label="Flagged items" value=${m.flagged} state=${m.flagged ? "warn" : "ok"} href="#review" sub="Open flags on drafts and letters in review" />
+      <${MetricCard} label="Unclear fields" value=${m.unclear} state=${m.unclear ? "warn" : "ok"} href="#review" sub="Fields marked unclear on live terms" />
+      <${MetricCard} label="Test-set accuracy" value=${C.pct(m.accuracy)} state=${m.accuracy == null ? "" : m.accuracy >= 0.9 ? "ok" : "bad"} sub=${m.lastRun ? `${pinned}, ${fmtDate(m.lastRun.at)}` : "No complete run yet for the pinned model"} />
+      <${MetricCard} label="Other-model extractions" value=${m.modelFallbacks} state=${m.modelFallbacks ? "bad" : "ok"} sub="Terms not extracted by the pinned model" />
+      <${MetricCard} label="Audit log" value=${s.chain ? (s.chain.ok ? "Intact" : "Broken") : "…"} state=${s.chain ? (s.chain.ok ? "ok" : "bad") : ""} href="#audit" sub=${s.chain ? `${s.chain.checked} entries checked ${fmtTime(s.chain.at)}` : "Checking"} />
+      <${MetricCard} label="Originals checked" value=${integ.length ? `${integ.length - integBad}/${integ.length}` : "—"} state=${integBad ? "bad" : integ.length ? "ok" : ""} sub=${integBad ? `${integBad} failed the hash check` : "Checked when opened"} />
+    </div>
+    <div class="card">
+      <div class="row"><h3>Alerts</h3>${alerts.length ? html`<button class="btn" disabled=${s.readOnly} onClick=${acknowledge}>Acknowledge and reset baseline</button>` : null}</div>
+      ${alerts.length ? html`<ul class="alerts">${alerts.map((a) => html`<li>${a.message}</li>`)}</ul>` : html`<p class="muted">No alerts. Counts are at or below the baseline acknowledged ${s.baseline ? `${fmtTime(s.baseline.ackAt)} by ${nameOf(s.baseline.ackBy)}` : "(none yet)"}.</p>`}
+      <p class="small muted">Alerts appear in the app when failed extractions, flagged items, unclear fields or other-model extractions rise above the baseline, or when test-set accuracy falls. The prototype cannot send email or texts.</p>
+      <div class="row"><button class="btn small" onClick=${() => s.originals.forEach((o) => verifyOriginal(o))}>Verify all ${s.originals.length} originals now</button><button class="btn small" onClick=${recheckChainFresh}>Re-check audit log</button></div>
+    </div>
+
+    <h2>Pinned model</h2>
+    <div class="card">
+      <dl class="facts"><div><dt>Every Claude call uses</dt><dd><code>${pinned}</code></dd></div><div><dt>Pinned</dt><dd>${fmtTime(s.config?.model?.pinnedAt)} by ${nameOf(s.config?.model?.pinnedBy)}</dd></div>
+        <div><dt>Prompt versions</dt><dd class="mono small">${Object.values(C.PROMPT_VERSIONS).join(" · ")}</dd></div><div><dt>Latest accuracy</dt><dd>${curRun ? C.pct(curRun.accuracy) : "Not yet tested"}</dd></div></dl>
+      <p class="small muted">If Claude answers with a different model than the one named (for example, the pinned model is unavailable to a viewer), the extraction is flagged and counted under "Other-model extractions".</p>
+      <h3>Switch to a different model</h3>
+      <p class="small">The switch unlocks only after a complete test run with the new model scores at least ${C.pct(bar)}${curRun ? " (the current model's latest accuracy)" : " (no current run, so the bar is 90%)"}.</p>
+      <div class="row"><input id="cand" type="text" placeholder="Model id, e.g. claude-opus-5-5" value=${cand} onInput=${(e) => setCand(e.target.value)} />
+        <button class="btn" disabled=${!cand.trim() || !!tr || s.readOnly || cand.trim() === pinned} onClick=${() => runTestSet(cand.trim(), "candidate")}>Run test set with it</button>
+        <button class="btn primary" disabled=${!canSwitch || s.readOnly} onClick=${switchModel}>Switch pinned model</button></div>
+      ${cand.trim() && cand.trim() !== pinned ? html`<p class="small">${candRun ? html`Latest complete run: ${C.pct(candRun.accuracy)} on ${fmtDate(candRun.at)}. ${canSwitch ? "Meets the bar." : "Below the bar."}` : "No complete run for this model yet."}</p>` : null}
+      ${(s.config?.model?.history || []).length ? html`<details><summary>Model history</summary><ul class="small">${s.config.model.history.map((h) => html`<li><code>${h.model}</code> from ${fmtDate(h.from)} to ${fmtDate(h.to)}</li>`)}</ul></details>` : null}
+    </div>
+
+    <h2>Test set</h2>
+    <div class="card">
+      <p class="muted">Side letters with known correct answers. A term counts as correct when it is found with the right category, MFN status and LP-status flag. Rerun after any change to the model or prompts.</p>
+      <div class="row"><button class="btn primary" disabled=${!!tr || s.readOnly || !s.tests.length} onClick=${() => runTestSet(pinned, "pinned")}>Run ${s.tests.length} cases with ${pinned}</button>
+        ${tr ? html`<span class="small">${tr.model}: ${tr.done} of ${tr.total} done${tr.current ? `, now ${tr.current}` : ""}…</span>` : null}</div>
+      <div class="tablewrap"><table class="tbl"><thead><tr><th>Case</th><th>Expected terms</th><th>Paragraphs</th><th>Added</th><th></th></tr></thead><tbody>
+        ${[...s.tests].sort((a, b) => a.name.localeCompare(b.name)).map((tc) => html`<tr key=${tc.id}><td>${tc.name}</td><td class="num">${tc.expected.length}</td><td class="num">${tc.paragraphs.length}</td><td>${fmtDate(tc.createdAt)} · ${nameOf(tc.createdBy)}</td>
+          <td><button class="btn small ghost" disabled=${s.readOnly || !!tr} onClick=${() => removeCase(tc)}>Remove</button></td></tr>`)}
+      </tbody></table></div>
+      <div class="row"><select id="add-case" value=${addLetter} onChange=${(e) => setAddLetter(e.target.value)}><option value="">Add a reviewed letter as a test case…</option>${reviewable.map((l) => html`<option value=${l.id}>${lpName(l.lpId)} (${fmtDate(l.signedDate)})</option>`)}</select>
+        <button class="btn" disabled=${!addLetter || s.readOnly} onClick=${addCase}>Add</button></div>
+    </div>
+    <h3>Runs</h3>
+    ${runs.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>When</th><th>Model</th><th>Prompt</th><th>Accuracy</th><th>Precision</th><th>Status</th><th></th></tr></thead><tbody>
+      ${runs.map((r) => html`<tr key=${r.id}><td>${fmtTime(r.at)}<div class="small muted">${nameOf(r.by)}</div></td><td><code>${r.model}</code>${r.model === pinned ? html` <${Pill} kind="info">pinned<//>` : null}</td><td class="mono small">${r.promptVersion}</td>
+        <td class="num">${r.accuracy != null ? C.pct(r.accuracy) : "—"}<div class="small muted">${r.correct != null ? `${r.correct}/${r.totalExpected}` : ""}</div></td><td class="num">${r.precision != null ? C.pct(r.precision) : "—"}</td>
+        <td>${r.status === "complete" ? html`<${Pill} kind="ok">Complete<//>` : r.status === "running" ? html`<${Pill} kind="info">Running<//>` : html`<${Pill} kind="warn" title=${r.reason || ""}>Incomplete<//>`}</td>
+        <td><button class="btn small ghost" onClick=${() => setOpenRun(openRun === r.id ? null : r.id)}>${openRun === r.id ? "Hide" : "Details"}</button></td></tr>`)}
+    </tbody></table></div>` : html`<${Empty} title="No test runs yet">Run the test set to measure accuracy for the pinned model.<//>`}
+    ${openRun ? (() => { const r = runs.find((x) => x.id === openRun); return r ? html`<div class="card">${r.reason ? html`<p class="note warn">${r.reason}</p>` : null}${(r.cases || []).map((c) => html`<div class="case">
+      <div class="row"><strong>${c.name}</strong> ${c.error ? html`<${Pill} kind="bad">Error<//>` : html`<span class="num">${c.correct}/${c.total} correct</span>`} ${c.extra ? html`<${Pill} kind="warn">${c.extra} extra<//>` : null} ${c.quoteFails ? html`<${Pill} kind="warn">${c.quoteFails} quote failures<//>` : null} ${c.unaccounted?.length ? html`<${Pill} kind="warn">¶ ${c.unaccounted.join(", ")} unaccounted<//>` : null} ${c.modelApplied && c.modelApplied !== r.model ? html`<${Pill} kind="bad">answered by ${c.modelApplied}<//>` : null}</div>
+      ${c.error ? html`<p class="small bad-text">${c.error}</p>` : html`<ul class="small">${(c.rows || []).filter((x) => x.result !== "correct").map((x) => html`<li><${Pill} kind=${x.result === "missed" ? "bad" : "warn"}>${x.result}<//> ${catName(x.category)}: "${x.quote}…" ${x.wrong?.length ? "— " + x.wrong.join(", ") : ""}</li>`)}</ul>`}
+    </div>`)}</div>` : null; })() : null}
+  </section>`;
+}
+
+/* ---------- audit log ---------- */
+function AuditView() {
+  const s = useStore();
+  const [q, setQ] = useState(""); const [open, setOpen] = useState(null); const [limit, setLimit] = useState(100);
+  const list = [...s.audit].sort((a, b) => b.seq - a.seq).filter((e) => !q || (e.summary + " " + e.action + " " + nameOf(e.actor)).toLowerCase().includes(q.toLowerCase()));
+  useEffect(() => { wantNames([...new Set(s.audit.map((e) => e.actor))]); }, [s.audit.length]);
+  const ch = s.chain;
+  return html`<section class="view">
+    <div class="view-h"><div><h1>Audit log</h1><p class="muted">Every change, newest first. Each entry stores the previous entry's SHA-256, so editing or deleting any entry breaks the chain from that point. Tampering is detected, not prevented.</p></div></div>
+    <div class=${"card chain " + (ch ? (ch.ok ? "ok" : "bad") : "")}>
+      <div class="row"><strong>${ch ? (ch.ok ? "Chain intact" : "Chain broken") : "Checking the chain…"}</strong>${ch ? html`<span class="small muted">${ch.checked} entries · head at entry ${s.auditHead?.seq} · checked ${fmtTime(ch.at)}</span>` : null}<button class="btn small" onClick=${recheckChainFresh}>Re-check</button></div>
+      ${ch && !ch.ok ? html`<ul class="small">${ch.problems.map((p) => html`<li>${p.message}</li>`)}</ul>` : null}
+      ${s.auditHead ? html`<div class="small">Latest hash <code class="hash">${s.auditHead.hash}</code></div>` : null}
+    </div>
+    <input id="audit-q" type="search" placeholder="Filter entries" value=${q} onInput=${(e) => setQ(e.target.value)} />
+    <ol class="audit">${list.slice(0, limit).map((e) => html`<li key=${e.seq} class=${ch?.bySeq?.[e.seq] === "broken" ? "broken" : ""}>
+      <div class="a-h"><span class="num seq">#${e.seq}</span><span class="small muted">${fmtTime(e.ts)}</span><span class="small">${nameOf(e.actor)}</span><code class="small">${e.action}</code>${ch?.bySeq?.[e.seq] === "broken" ? html`<${Pill} kind="bad">fails check<//>` : null}</div>
+      <p>${e.summary}</p>
+      <button class="linkbtn small" onClick=${() => setOpen(open === e.seq ? null : e.seq)}>${open === e.seq ? "Hide details" : "Details"}</button>
+      ${open === e.seq ? html`<div class="a-d"><div class="small">Hash <code class="hash">${e.hash}</code></div><div class="small">Previous <code class="hash">${e.prevHash}</code></div><pre>${JSON.stringify(e.data, null, 2)}</pre></div>` : null}
+    </li>`)}</ol>
+    ${list.length > limit ? html`<button class="btn" onClick=${() => setLimit(limit + 200)}>Show more</button>` : null}
+  </section>`;
+}
+
+/* ---------- settings ---------- */
+function ConfigView() {
+  const s = useStore();
+  const cfg = s.config;
+  const [cats, setCats] = useState(null);
+  const [veh, setVeh] = useState("");
+  const [fee, setFee] = useState(null);
+  if (!cfg) return html`<section class="view"><${Empty} title="Settings are loading" /></section>`;
+  const used = (id) => s.terms.filter((t) => t.category === id).length;
+  const draft = cats || cfg.categories.map((c) => ({ ...c, kw: c.keywords.join(", ") }));
+  async function saveCats() {
+    await act("Saving categories", async () => {
+      const next = draft.map((c) => ({ id: c.id, name: c.name.trim() || c.id, keywords: c.kw.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) }));
+      await patch("config/main", { categories: next });
+      await appendAudit("categories.updated", "config", "main", `Updated term categories (${next.length})`, { before: cfg.categories, after: next });
+      setCats(null); toast("ok", "Categories saved.");
+    });
+  }
+  async function addVehicle() {
+    await act("Adding vehicle", async () => {
+      const next = [...cfg.vehicles, veh.trim()];
+      await patch("config/main", { vehicles: next });
+      await appendAudit("vehicles.updated", "config", "main", `Added vehicle "${veh.trim()}"`, { before: cfg.vehicles, after: next });
+      setVeh("");
+    });
+  }
+  async function saveFee() {
+    await act("Saving", async () => {
+      const fund = { ...cfg.fund, standardFeePct: Number(fee) };
+      await patch("config/main", { fund });
+      await appendAudit("fund.updated", "config", "main", `Set standard management fee to ${fee}%`, { before: cfg.fund.standardFeePct, after: Number(fee) });
+      setFee(null);
+    });
+  }
+  const capRow = (k, label, offText) => html`<div><dt>${label}</dt><dd>${s.caps[k] === "on" ? html`<${Pill} kind="ok">On<//>` : s.caps[k] === "loading" ? html`<${Pill} kind="info">Checking<//>` : html`<${Pill} kind="warn">Off<//>`} <span class="small muted">${s.caps[k] === "off" ? offText : ""}</span></dd></div>`;
+  return html`<section class="view">
+    <div class="view-h"><h1>Settings</h1></div>
+    <div class="card"><h3>Fund</h3>
+      <dl class="facts"><div><dt>Fund</dt><dd>${cfg.fund.name}</dd></div><div><dt>Standard management fee</dt><dd>${fee === null ? html`${cfg.fund.standardFeePct}% <button class="linkbtn" disabled=${s.readOnly} onClick=${() => setFee(cfg.fund.standardFeePct)}>edit</button>` : html`<input id="std-fee" type="number" step="0.05" value=${fee} onInput=${(e) => setFee(e.target.value)} /> <button class="btn small" onClick=${saveFee}>Save</button>`}</dd></div>
+        <div><dt>Carry / hurdle</dt><dd>${cfg.fund.standardCarryPct}% / ${cfg.fund.hurdlePct}%</dd></div><div><dt>MFN clause</dt><dd>${cfg.fund.mfnSection}</dd></div></dl>
+      <h3>Vehicles</h3><ul>${cfg.vehicles.map((v) => html`<li>${v}</li>`)}</ul>
+      <div class="row"><input id="new-veh" type="text" placeholder="e.g. Co-investment vehicle" value=${veh} onInput=${(e) => setVeh(e.target.value)} /><button class="btn" disabled=${!veh.trim() || s.readOnly} onClick=${addVehicle}>Add vehicle</button></div>
+    </div>
+    <div class="card"><div class="row"><h3>Term categories</h3><span class="small muted">Keywords drive the keyword cross-check in search.</span></div>
+      <div class="tablewrap"><table class="tbl"><thead><tr><th>Name</th><th>Keywords (comma-separated)</th><th>Terms</th><th></th></tr></thead><tbody>
+        ${draft.map((c, i) => html`<tr key=${c.id}><td><input id=${"cn-" + c.id} type="text" value=${c.name} onInput=${(e) => setCats(draft.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} /></td>
+          <td><input id=${"ck-" + c.id} class="wideinput" type="text" value=${c.kw} onInput=${(e) => setCats(draft.map((x, j) => (j === i ? { ...x, kw: e.target.value } : x)))} /></td>
+          <td class="num">${used(c.id)}</td><td>${used(c.id) ? html`<span class="small muted">in use</span>` : html`<button class="btn small ghost" onClick=${() => setCats(draft.filter((_, j) => j !== i))}>Remove</button>`}</td></tr>`)}
+      </tbody></table></div>
+      <div class="row"><button class="btn" onClick=${() => setCats([...draft, { id: "cat-" + Math.random().toString(36).slice(2, 7), name: "New category", kw: "" }])}>Add category</button>
+        <button class="btn primary" disabled=${!cats || s.readOnly} onClick=${saveCats}>Save categories</button>${cats ? html`<button class="btn ghost" onClick=${() => setCats(null)}>Discard</button>` : null}</div>
+    </div>
+    <div class="card"><h3>This view</h3><dl class="facts">
+      ${capRow("db", "Shared database", "Nothing can load or save.")}
+      ${capRow("sample", "Claude (extraction, search)", "Enter terms by hand and use the filters.")}
+      ${capRow("assets", "Read-only file store", "Small originals are kept in the database instead.")}
+      ${capRow("downloads", "Download originals", "")}
+      <div><dt>Your access</dt><dd>${s.readOnly ? html`<${Pill} kind="warn">View only<//>` : html`<${Pill} kind="ok">Can make changes<//>`}</dd></div>
+    </dl><p class="small muted">Prototype: made-up data only. Access controls by role, obligation reminders, conflict warnings and LPA links are planned for later versions.</p></div>
+  </section>`;
+}
+
+/* ---------- shell ---------- */
+function parseRoute(h) {
+  h = (h || "").replace(/^#/, "");
+  if (!h) return { v: "search" };
+  if (h.startsWith("letter-")) return { v: "letter", id: h.slice(7) };
+  if (h.startsWith("review-")) return { v: "reviewletter", id: h.slice(7) };
+  if (h === "mfn-packages") return { v: "mfn", sub: "packages" };
+  if (h === "mfn-records") return { v: "mfn", sub: "records" };
+  return { v: h };
+}
+function App() {
+  const s = useStore();
+  const [route, setRoute] = useState(parseRoute(location.hash));
+  useEffect(() => { const f = () => setRoute(parseRoute(location.hash)); window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f); }, []);
+  const m = useMemo(() => C.metrics(s), [s.letters, s.terms, s.testRuns, s.config]);
+  const alerts = [...C.alertsFrom(m, s.baseline)];
+  if (s.chain && !s.chain.ok) alerts.unshift({ key: "chain", message: "The audit log failed its chain check: an entry was edited or deleted" });
+  const badInteg = Object.values(s.integrity).filter((x) => x.status === "mismatch").length;
+  if (badInteg) alerts.unshift({ key: "integ", message: `${badInteg} original ${badInteg === 1 ? "document fails" : "documents fail"} the hash check` });
+  const reviewCount = s.letters.filter((l) => ["needs_review", "failed"].includes(l.status)).length;
+  const loaded = s.ready.config && s.ready.letters && s.ready.terms;
+  const nav = [["search", "Search"], ["letters", "Side letters"], ["review", "Review", reviewCount], ["mfn", "MFN"], ["lps", "LPs"], ["quality", "Quality", alerts.length ? "!" : null], ["audit", "Audit log"], ["config", "Settings"]];
+  const active = { letter: "letters", reviewletter: "review", add: "letters" }[route.v] || route.v;
+  let view;
+  if (s.caps.db === "off") view = html`<section class="view"><${Empty} title="The shared database isn't available in this view">Open this page in Claude while signed in to see and change the side letter records.<//></section>`;
+  else if (!loaded) view = html`<section class="view"><div class="loading">${s.slowNote ? "Still waiting for the shared database. Your connection may be slow; records will appear when it answers." : "Loading records…"}</div></section>`;
+  else if (!s.config) view = html`<section class="view"><${Empty} title="No settings found">The database has no fund settings yet.<//></section>`;
+  else view = ({
+    search: () => html`<${SearchView} />`, letters: () => html`<${LettersView} />`, letter: () => html`<${LetterDetail} id=${route.id} />`, add: () => html`<${IntakeView} />`,
+    review: () => html`<${ReviewList} />`, reviewletter: () => html`<${ReviewLetter} id=${route.id} />`, mfn: () => html`<${MfnView} sub=${route.sub} />`,
+    lps: () => html`<${LpsView} />`, quality: () => html`<${QualityView} />`, audit: () => html`<${AuditView} />`, config: () => html`<${ConfigView} />`,
+  }[route.v] || (() => html`<${SearchView} />`))();
+  const meName = RT.meId ? s.names[RT.meId] : "";
+  return html`<div class="app">
+    <header class="top"><div class="top-in">
+      <a class="brand" href="#search"><span class="mark" aria-hidden="true">§</span><span><strong>Side Letter Tracker</strong><span class="fund">${s.config?.fund?.name || ""}</span></span></a>
+      <div class="who">${s.readOnly ? html`<${Pill} kind="warn">View only<//>` : null}${s.busy ? html`<span class="busy">${s.busy}…</span>` : null}<span class="small muted">${meName || ""}</span></div>
+    </div>
+    <nav class="tabs" aria-label="Sections"><div class="tabs-in">${nav.map(([k, l, badge]) => html`<a href=${"#" + k} class=${active === k ? "on" : ""}>${l}${badge ? html`<span class=${"badge" + (badge === "!" ? " alert" : "")}>${badge}</span>` : null}</a>`)}</div></nav></header>
+    ${alerts.length && loaded ? html`<div class="alertbar"><div class="alertbar-in"><strong>${alerts.length} ${alerts.length === 1 ? "alert" : "alerts"}</strong><span>${alerts.map((a) => a.message).join(" · ")}</span><a href="#quality">Review in Quality</a></div></div>` : null}
+    <main>${view}</main>
+    ${s.toast ? html`<div class=${"toast " + s.toast.kind} role="status">${s.toast.text}</div>` : null}
+  </div>`;
+}
+
+render(html`<${App} />`, document.getElementById("root"));
+boot();
+
+</script>
+
+</body></html>
