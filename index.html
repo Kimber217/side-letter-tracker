@@ -331,7 +331,7 @@ const CORE = (() => {
   /* ---- Terms ---- */
   const TERM_UNCLEAR_FIELDS = [
     ["vehicle", "Fund or vehicle"], ["conditions", "Conditions"], ["expiry", "Expiry or trigger"],
-    ["lpStatusBased", "LP-status based"], ["mfnStatus", "MFN status"], ["obligation.is", "Ongoing obligation"], ["obligation.deadline", "Obligation deadline"],
+    ["grantBasis", "Grant basis"], ["mfnStatus", "MFN status"], ["obligation.is", "Ongoing obligation"], ["obligation.deadline", "Obligation deadline"],
     ["category", "Category"], ["summary", "Summary"],
   ];
   function getPath(o, p) { return p.split(".").reduce((a, k) => (a == null ? a : a[k]), o); }
@@ -345,6 +345,18 @@ const CORE = (() => {
     return out;
   }
   const isLive = (t) => t.status !== "rejected" && t.status !== "superseded";
+
+  /* ---- Grant basis: why the fund gave a term. An array once set ([] = none); not an array = not set yet. ---- */
+  const GRANT_BASES = [["size", "Commitment size"], ["closing", "Closing date"], ["lp_status", "LP status"], ["anchor", "Anchor package"]];
+  const grantBasisLabel = (b) => (GRANT_BASES.find((x) => x[0] === b) || [b, b])[1];
+  function grantBasesOf(t) { return Array.isArray(t.grantBasis) ? t.grantBasis : null; }
+  function normGrantBases(v) {
+    if (!Array.isArray(v)) return UNCLEAR;
+    const ok = GRANT_BASES.map((x) => x[0]);
+    return [...new Set(v.map((x) => String(x).trim().toLowerCase()).filter((x) => ok.includes(x)))];
+  }
+  /* A condition is anything other than an empty or "None" conditions field; "unclear" counts. */
+  function hasCondition(t) { const c = String(t.conditions ?? "").trim(); return !!c && !/^(none|n\/a|null)$/i.test(c); }
 
   /* Flags that need a person to look. Computed, never stored, so they always reflect the current state. */
   function termFlags(t, letter) {
@@ -422,25 +434,31 @@ const CORE = (() => {
      Can LP `elector` claim a term granted to LP `grantee`?
      returns {status: "eligible"|"not_eligible"|"review", reasons:[...]} */
   function mfnEligibility(elector, grantee, term, bundle) {
-    const reasons = [];
     const m = elector.mfn || {};
     if (!m.hasMfn) return { status: "not_eligible", reasons: ["Has no MFN clause"] };
     if (grantee && elector.id === grantee.id) return { status: "not_eligible", reasons: ["This is the LP that holds the term"] };
     if (term.mfnStatus === "excluded") return { status: "not_eligible", reasons: ["Term is marked excluded from MFN: " + (term.mfnReason || "no reason given")] };
-    if (term.mfnStatus !== "electable") return { status: "review", reasons: ["Term's MFN status is not set"] };
-    if ((m.excludedCategories || []).includes(term.category)) return { status: "not_eligible", reasons: [`This LP's MFN excludes the ${term.category} category`] };
+    if ((m.excludedCategories || []).includes(term.category)) return { status: "not_eligible", reasons: [`This LP's MFN carve-out excludes the ${term.category} category`] };
     if ((m.excludedTermIds || []).includes(term.id)) return { status: "not_eligible", reasons: ["This LP's MFN excludes this specific term"] };
-    if (m.basis === "manual") return { status: "review", reasons: ["MFN decided case by case" + (m.note ? ": " + m.note : "")] };
-    if (m.basis === "all") reasons.push("MFN covers all LPs' terms");
+    const bases = grantBasesOf(term);
+    const hit = (bases || []).filter((b) => (m.excludedGrantBases || []).includes(b));
+    if (hit.length) return { status: "not_eligible", reasons: [`This LP's MFN carve-out excludes terms granted for ${hit.map(grantBasisLabel).join(" or ").toLowerCase()}`] };
+    const reasons = []; const review = [];
+    if (m.basis === "manual") review.push("MFN decided case by case" + (m.note ? ": " + m.note : ""));
+    else if (m.basis === "all") reasons.push("MFN covers all LPs' terms");
     else {
       const limit = m.thresholdUsd != null ? m.thresholdUsd : elector.commitmentUsd;
       const gc = grantee ? grantee.commitmentUsd : null;
-      if (gc == null) return { status: "review", reasons: ["Grantee's commitment is unknown"] };
-      if (gc > limit) return { status: "not_eligible", reasons: [`Holder committed ${usd(gc)}, above this LP's MFN limit of ${usd(limit)}`] };
-      reasons.push(`Holder committed ${usd(gc)}, within this LP's MFN limit of ${usd(limit)}${m.thresholdUsd != null ? " (custom threshold)" : " (its own commitment)"}`);
+      if (gc == null) review.push("Holder's commitment is unknown");
+      else if (gc > limit) return { status: "not_eligible", reasons: [`Holder committed ${usd(gc)}, above this LP's MFN limit of ${usd(limit)}`] };
+      else reasons.push(`Holder committed ${usd(gc)}, within this LP's MFN limit of ${usd(limit)}${m.thresholdUsd != null ? " (custom threshold)" : " (its own commitment)"}`);
     }
-    if (m.note) reasons.push("Note: " + m.note);
+    if (term.mfnStatus !== "electable") review.push("Term's MFN status is not set");
+    if (!bases) review.push("Grant basis not set yet, so this LP's carve-outs can't be checked");
+    if (hasCondition(term)) review.push("Condition to check against this LP: " + term.conditions);
+    if (m.note && m.basis !== "manual") reasons.push("Note: " + m.note);
     if (bundle && bundle.allOrNothing) reasons.push(`Must elect the whole "${bundle.name}" bundle, including its conditions`);
+    if (review.length) return { status: "review", reasons: [...review, ...reasons] };
     return { status: "eligible", reasons };
   }
   function usd(n) {
@@ -471,7 +489,9 @@ const CORE = (() => {
       const g = got[best]; const wrong = [];
       if (g.category !== ex.category) wrong.push(`category (${g.category} vs ${ex.category})`);
       if (g.mfnStatus !== ex.mfnStatus) wrong.push(`MFN status (${g.mfnStatus} vs ${ex.mfnStatus})`);
-      if (g.lpStatusBased !== ex.lpStatusBased) wrong.push(`LP-status based (${g.lpStatusBased} vs ${ex.lpStatusBased})`);
+      const exLp = Array.isArray(ex.grantBasis) ? ex.grantBasis.includes("lp_status") : ex.lpStatusBased === "yes";
+      const gLp = Array.isArray(g.grantBasis) && g.grantBasis.includes("lp_status");
+      if (exLp !== gLp) wrong.push(`LP status grant basis (${gLp ? "yes" : "no"} vs ${exLp ? "yes" : "no"})`);
       rows.push({ expected: ex, result: wrong.length ? "wrong" : "correct", wrong, got: g });
     }
     const extra = got.filter((_, i) => !used.has(i));
@@ -480,7 +500,8 @@ const CORE = (() => {
 
   return { ZERO_HASH, PROMPT_VERSIONS, UNCLEAR, canon, sha256Bytes, sha256Text, auditBody, hashAuditEntry, auditId, verifyAuditChain,
     normalizeForQuote, documentText, quoteCheck, splitParagraphs, unclearFields, isLive, termFlags, coverage, letterFlags,
-    metrics, alertsFrom, pct, mfnEligibility, usd, quoteOverlap, scoreCase, getPath };
+    metrics, alertsFrom, pct, mfnEligibility, usd, quoteOverlap, scoreCase, getPath,
+    GRANT_BASES, grantBasisLabel, grantBasesOf, normGrantBases, hasCondition };
 })();
 
 
@@ -493,6 +514,7 @@ const store = {
   state: {
     ready: {}, config: null, baseline: null, auditHead: null,
     lps: [], letters: [], terms: [], bundles: [], originals: [], elections: [], tests: [], testRuns: [], audit: [],
+    all: { lps: [], letters: [], terms: [], elections: [] },
     names: { [SEED_ACTOR]: "Sample data" }, caps: { db: "loading", sample: "loading", assets: "loading", downloads: "loading", user: "loading" },
     integrity: {}, chain: null, toast: null, busy: null, slowNote: false, readOnly: false, testRun: null,
   },
@@ -551,6 +573,20 @@ function nameOf(id) {
 
 /* ---------- boot ---------- */
 const COLLECTIONS = ["lps", "letters", "terms", "bundles", "originals", "elections", "tests", "testRuns", "audit"];
+/* Archived records stay in the database but drop out of every working list. store.state.lps, .letters, .terms and
+   .elections hold only active records; store.state.all holds everything, for the archive shelves and restore. */
+const RAW = { lps: [], letters: [], terms: [], elections: [] };
+function recomputeActive() {
+  const lpOff = new Set(RAW.lps.filter((l) => l.archived).map((l) => l.id));
+  const letterOff = new Set(RAW.letters.filter((l) => l.archived || lpOff.has(l.lpId)).map((l) => l.id));
+  store.set({
+    lps: RAW.lps.filter((l) => !l.archived),
+    letters: RAW.letters.filter((l) => !letterOff.has(l.id)),
+    terms: RAW.terms.filter((x) => !letterOff.has(x.letterId) && !lpOff.has(x.lpId)),
+    elections: RAW.elections.filter((e) => !e.archived && !lpOff.has(e.lpId)),
+    all: { lps: RAW.lps, letters: RAW.letters, terms: RAW.terms, elections: RAW.elections },
+  });
+}
 async function boot() {
   const use = (n) => (window.claude && window.claude.use ? window.claude.use(n).catch(() => null) : Promise.resolve(null));
   const slow = setTimeout(() => store.set({ slowNote: true }), 10000);
@@ -568,7 +604,8 @@ async function boot() {
   for (const col of COLLECTIONS) {
     db.collection(col).onSnapshot((snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      store.set({ [col]: list }); if (!snap.metadata.fromCache) mark(col);
+      if (col in RAW) { RAW[col] = list; recomputeActive(); } else store.set({ [col]: list });
+      if (!snap.metadata.fromCache) mark(col);
       if (col === "audit") scheduleChainCheck();
     }, onErr(col));
   }
@@ -767,7 +804,7 @@ Side letter, numbered paragraphs:
 ${paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n")}
 
 Reply with only one JSON object, no prose:
-{"terms":[{"category":"<category id>","summary":"one plain-English sentence","quote":"text copied character-for-character from the letter","paragraphs":[<paragraph numbers this term relies on>],"vehicle":"<vehicle the term applies to>","conditions":"conditions the benefit depends on, or None","expiry":"end date or trigger, or None","lpStatusBased":"yes|no|unclear","mfnStatus":"electable|excluded|unclear","mfnReason":"short reason","obligation":{"is":"yes|no|unclear","deadline":"frequency or deadline if yes, else empty"},"feeRatePct":<number or null>,"carryPct":<number or null>,"bundleKey":"<key shared by terms granted together, or null>"}],
+{"terms":[{"category":"<category id>","summary":"one plain-English sentence","quote":"text copied character-for-character from the letter","paragraphs":[<paragraph numbers this term relies on>],"vehicle":"<vehicle the term applies to>","conditions":"conditions the benefit depends on, or None","expiry":"end date or trigger, or None","grantBasis":["size"|"closing"|"lp_status"|"anchor", ...] or "unclear","mfnStatus":"electable|excluded|unclear","mfnReason":"short reason","obligation":{"is":"yes|no|unclear","deadline":"frequency or deadline if yes, else empty"},"feeRatePct":<number or null>,"carryPct":<number or null>,"bundleKey":"<key shared by terms granted together, or null>"}],
 "noObligationParagraphs":[<paragraph numbers with no right or obligation, e.g. recitals, governing law>],
 "bundles":[{"key":"<bundleKey>","name":"short name","allOrNothing":true,"reason":"why these go together"}]}
 
@@ -775,8 +812,8 @@ Rules:
 1. Every paragraph number from 1 to ${paragraphs.length} must appear in some term's "paragraphs" or in "noObligationParagraphs". A paragraph can support several terms.
 2. "quote" must be an exact, contiguous copy of the letter's words (at least 15 characters, ideally one sentence). Do not paraphrase or fix typos.
 3. Any field you cannot determine from the text is the string "unclear". Do not guess.
-4. lpStatusBased is "yes" when the term exists because of what the investor legally is (public pension public-records laws, sovereign immunity, ERISA plan assets, insurance regulation, fund-of-funds look-through, state investment policies).
-5. mfnStatus: "excluded" for LP-status terms, for the MFN right itself, and for anything the letter says may not be elected; otherwise "electable" if another LP could claim it through an MFN clause. Always give mfnReason.
+4. grantBasis lists why the fund gave the term: "size" (tied to the size of the investor's commitment), "closing" (tied to when the investor was admitted, such as the first or initial closing), "lp_status" (exists because of what the investor legally is: public-records laws, sovereign immunity, ERISA plan assets, insurance regulation, fund-of-funds look-through, state investment policies), "anchor" (granted as part of an anchor or cornerstone package). Use [] when none applies; several can apply.
+5. mfnStatus: "excluded" for terms whose grantBasis includes lp_status, for the MFN right itself, and for anything the letter says may not be elected; otherwise "electable" if another LP could claim it through an MFN clause. Always give mfnReason.
 6. feeRatePct: the investor's resulting annual management fee rate in percent when the term sets or changes it (a 0.10% reduction from ${fund.standardFeePct ?? 1.5}% is ${((fund.standardFeePct ?? 1.5) - 0.1).toFixed(2)}); otherwise null. carryPct likewise for carried interest.
 7. Use bundleKey when the letter grants terms together, or ties a benefit to a condition or obligation in another paragraph that an electing LP would also have to accept. Set allOrNothing true when they cannot be elected separately.
 8. vehicle is "${ctx.vehicle}" unless the clause limits the term to a different vehicle.`;
@@ -797,7 +834,7 @@ function normalizeTerm(raw, paragraphs, ctx) {
     category: catIds.includes(lc(raw.category)) ? lc(raw.category) : C.UNCLEAR,
     summary: str(raw.summary), quote: String(raw.quote ?? "").trim(), paragraphs: [...new Set(paras)].sort((a, b) => a - b),
     vehicle: raw.vehicle ? str(raw.vehicle) : ctx.vehicle, conditions: optStr(raw.conditions), expiry: optStr(raw.expiry),
-    lpStatusBased: pick(raw.lpStatusBased, ["yes", "no"]), mfnStatus: pick(raw.mfnStatus, ["electable", "excluded"]), mfnReason: String(raw.mfnReason ?? "").trim(),
+    grantBasis: C.normGrantBases(raw.grantBasis), mfnStatus: pick(raw.mfnStatus, ["electable", "excluded"]), mfnReason: String(raw.mfnReason ?? "").trim(),
     obligation: { is: pick(ob.is, ["yes", "no"]), deadline: String(ob.deadline ?? "").trim() || (lc(ob.is) === "yes" ? C.UNCLEAR : "") },
     feeRatePct: num(raw.feeRatePct), carryPct: num(raw.carryPct), bundleKey: raw.bundleKey ? String(raw.bundleKey) : null,
   };
@@ -820,9 +857,9 @@ Side letter, numbered paragraphs:
 ${paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n")}
 
 Extracted terms (index: fields):
-${terms.map((t, i) => `${i}: ${JSON.stringify({ category: t.category, summary: t.summary, quote: t.quote, paragraphs: t.paragraphs, conditions: t.conditions, expiry: t.expiry, lpStatusBased: t.lpStatusBased, mfnStatus: t.mfnStatus, obligation: t.obligation, feeRatePct: t.feeRatePct })}`).join("\n")}
+${terms.map((t, i) => `${i}: ${JSON.stringify({ category: t.category, summary: t.summary, quote: t.quote, paragraphs: t.paragraphs, conditions: t.conditions, expiry: t.expiry, grantBasis: t.grantBasis, mfnStatus: t.mfnStatus, obligation: t.obligation, feeRatePct: t.feeRatePct })}`).join("\n")}
 
-Look for: rights or obligations in the letter that no term captures; wrong category; conditions, expiry dates or triggers that were missed; wrong MFN status or LP-status flag; wrong fee rate; misread deadlines.
+Look for: rights or obligations in the letter that no term captures; wrong category; conditions, expiry dates or triggers that were missed; wrong MFN status or grant basis; wrong fee rate; misread deadlines. The fund's standard management fee is ${store.state.config?.fund?.standardFeePct ?? 1.5}% per year, so a resulting rate computed from it is supported.
 
 Reply with only JSON: {"issues":[{"paragraph":<number or null>,"termIndex":<index or null>,"field":"<field name or null>","severity":"high|medium|low","problem":"one sentence"}]}`;
   const r = await callModel(prompt, { model, signal });
@@ -833,7 +870,42 @@ Reply with only JSON: {"issues":[{"paragraph":<number or null>,"termIndex":<inde
   return { issues, model: r.model, modelApplied: r.modelApplied };
 }
 
-/* Full pipeline for a stored letter: extract -> quote + coverage checks -> second pass -> ready for review. */
+/* Reads the facts the LP record must match (B3) and drafts the LP's MFN carve-outs from its MFN clause (B1).
+   Results wait on the letter for the reviewer: facts are compared at review, the MFN draft must be confirmed. */
+async function readLetterFacts(letterId, { signal } = {}) {
+  const s = store.state; const letter = s.all.letters.find((l) => l.id === letterId); const lp = s.all.lps.find((l) => l.id === letter.lpId);
+  const cats = categoryList().map((c) => `${c.id} = ${c.name}`).join("; ");
+  const prompt = `Read this side letter of a private infrastructure fund and report (a) facts about the investor and (b) what the investor's MFN (most favored nation) clause lets it claim. A wrong answer is worse than null: never guess.
+
+Side letter, numbered paragraphs:
+${letter.paragraphs.map((p, i) => `[${i + 1}] ${p}`).join("\n")}
+
+Category ids: ${cats}
+Grant bases: size (terms tied to commitment size), closing (terms tied to when an investor was admitted), lp_status (terms that exist because of an investor's legal or regulatory status), anchor (anchor or cornerstone packages).
+
+Reply with only JSON:
+{"facts":{"legalName":"investor's full legal name as written, or null","commitmentUsd":<investor's capital commitment in US dollars as a number, or null if the letter does not state it>,"letterDate":"YYYY-MM-DD date the letter is dated, or null","closing":"the closing the letter says the investor was admitted at (e.g. Initial Closing), or null"},
+"mfn":{"hasMfn":true|false,"paragraphs":[<MFN paragraph numbers>],"basis":"size|all|manual","thresholdUsd":<number or null>,"excludedCategories":[<category ids the clause carves out>],"excludedGrantBases":[<grant bases the clause carves out>],"note":"one sentence on anything else the clause limits, or empty","quote":"the carve-out text copied exactly, or empty"}}
+basis "size" = terms granted to LPs with commitments equal to or smaller than this investor's; "all" = any LP's terms; "manual" = the clause leaves it to case-by-case decisions or counsel confirmation. Use excludedCategories only when the clause carves out a whole kind of term (such as advisory committee seats or co-investment rights) and excludedGrantBases when it carves out terms by why they were granted (such as fee reductions for commitment size or early closings, or terms based on another LP's legal status).`;
+  const r = await callModel(prompt, { signal });
+  const f = r.json?.facts || {}; const m = r.json?.mfn || {};
+  const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  const str = (v) => (v == null || !String(v).trim() || /^(null|unclear)$/i.test(String(v).trim()) ? null : String(v).trim());
+  const date = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) ? String(v) : null);
+  const catIds = categoryList().map((c) => c.id);
+  const facts = { legalName: str(f.legalName), commitmentUsd: num(f.commitmentUsd), letterDate: date(f.letterDate), closing: str(f.closing), model: r.model, modelApplied: r.modelApplied, at: new Date().toISOString(), by: RT.meId };
+  const bases = C.normGrantBases(m.excludedGrantBases);
+  const mfnProposal = { hasMfn: m.hasMfn === true, paragraphs: (Array.isArray(m.paragraphs) ? m.paragraphs : []).map(Number).filter((x) => Number.isInteger(x)),
+    basis: ["size", "all", "manual"].includes(m.basis) ? m.basis : "size", thresholdUsd: num(m.thresholdUsd),
+    excludedCategories: (Array.isArray(m.excludedCategories) ? m.excludedCategories : []).map(String).filter((x) => catIds.includes(x)),
+    excludedGrantBases: Array.isArray(bases) ? bases : [], note: String(m.note || "").trim(), quote: String(m.quote || "").trim(),
+    confirmed: false, model: r.model, modelApplied: r.modelApplied, at: facts.at };
+  await patch("letters/" + letterId, { facts, mfnProposal, factChecks: {} });
+  await appendAudit("letter.facts_read", "letter", letterId, `Read letter facts and MFN clause for ${lp?.name || "the LP"}: commitment ${facts.commitmentUsd != null ? C.usd(facts.commitmentUsd) : "not stated"}, MFN ${mfnProposal.hasMfn ? "found" : "not found"}`, { facts, mfnProposal });
+  return { facts, mfnProposal };
+}
+
+/* Full pipeline for a stored letter: extract -> quote + coverage checks -> second pass -> facts and MFN clause -> ready for review. */
 async function runExtraction(letterId, { onStep, signal } = {}) {
   const s = store.state; const letter = s.letters.find((l) => l.id === letterId); const lp = s.lps.find((l) => l.id === letter.lpId);
   const ctx = { lpName: lp?.name || "the Investor", lpType: lp?.type || "other", vehicle: letter.vehicle };
@@ -892,6 +964,11 @@ async function runExtraction(letterId, { onStep, signal } = {}) {
     await appendAudit("secondpass.failed", "letter", letterId, "Second-pass check failed: " + msg, { error: msg });
     step("second", "bad", "Second pass failed: " + msg + " (flagged for line-by-line review)");
   }
+  try {
+    step("facts", "run", "Reading the commitment, legal name, date, closing and MFN clause…");
+    const fr = await readLetterFacts(letterId, { signal });
+    step("facts", "ok", `Letter facts read; MFN clause ${fr.mfnProposal.hasMfn ? "found, carve-outs drafted for review" : "not found"}`);
+  } catch (e) { step("facts", "bad", "Could not read the letter facts: " + errText(e) + " (run it again from the review screen)"); }
   return { termIds };
 }
 
@@ -907,7 +984,7 @@ const go = (h) => { location.hash = h; window.scrollTo(0, 0); };
 const fmtDate = (iso) => { if (!iso) return "—"; const d = new Date(iso.length === 10 ? iso + "T12:00:00" : iso); return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }); };
 const fmtTime = (iso) => (iso ? new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
 const short = (h) => (h ? h.slice(0, 10) + "…" + h.slice(-6) : "—");
-const lpName = (id) => store.state.lps.find((l) => l.id === id)?.name || "Unknown LP";
+const lpName = (id) => store.state.all.lps.find((l) => l.id === id)?.name || "Unknown LP";
 const pctFee = (x) => (x == null ? null : `${Number(x).toFixed(2)}%`);
 const bp = (x) => (x == null ? "" : `${Math.round(Number(x) * 100)} bp`);
 
@@ -922,6 +999,13 @@ function Empty({ title, children }) { return html`<div class="empty"><strong>${t
 function Field({ label, hint, children, wide }) { return html`<label class=${"field" + (wide ? " wide" : "")}><span class="flabel">${label}</span>${children}${hint ? html`<span class="fhint">${hint}</span>` : null}</label>`; }
 function Seg({ value, options, onChange, disabled }) {
   return html`<div class="seg" role="group">${options.map(([v, l]) => html`<button type="button" class=${value === v ? "on" : ""} disabled=${disabled} onClick=${() => onChange(v)}>${l}</button>`)}</div>`;
+}
+const grantBasisText = (x) => { const b = C.grantBasesOf(x); return b == null ? "Not set" : b.length ? b.map(C.grantBasisLabel).join(", ") : "None"; };
+function GrantBasisField({ value, onChange, id }) {
+  const set = Array.isArray(value);
+  return html`<div class="gb"><${Toggles} values=${set ? value : []} options=${C.GRANT_BASES} onChange=${(v) => onChange(v)} />
+    <span class="check"><input id=${id} type="checkbox" checked=${set && !value.length} onChange=${(e) => onChange(e.target.checked ? [] : C.UNCLEAR)} /> None of these</span>
+    ${!set ? html`<span class="fhint">Not set yet</span>` : null}</div>`;
 }
 function Toggles({ values, options, onChange }) {
   const set = new Set(values || []);
@@ -955,7 +1039,6 @@ function TermCard({ t, words, showLp = true, extra }) {
       ${showLp ? html`<a class="lp" href=${"#letter-" + t.letterId}>${lpName(t.lpId)}</a>` : null}
       <${Pill} kind="cat">${catName(t.category)}<//>
       <${MfnPill} v=${t.mfnStatus} />
-      ${t.lpStatusBased === "yes" ? html`<${Pill} kind="neutral">LP-status based<//>` : null}
       ${t.status !== "approved" ? html`<${StatusPill} status=${t.status} />` : null}
       ${t.feeRatePct != null ? html`<span class="num">${pctFee(t.feeRatePct)} <span class="muted">(${bp(t.feeRatePct)})</span></span>` : null}
     </header>
@@ -967,6 +1050,7 @@ function TermCard({ t, words, showLp = true, extra }) {
       <div><dt>Expiry / trigger</dt><dd>${t.expiry}</dd></div>
       <div><dt>Ongoing obligation</dt><dd>${t.obligation?.is === "yes" ? t.obligation.deadline || "Yes" : t.obligation?.is === "no" ? "No" : "Unclear"}</dd></div>
       <div><dt>MFN reason</dt><dd>${t.mfnReason || "—"}</dd></div>
+      <div><dt>Granted for</dt><dd>${grantBasisText(t)}</dd></div>
     </dl>
     ${bundle ? html`<div class="bundle-box">
       <div><strong>Bundle: ${bundle.name}</strong> ${bundle.allOrNothing ? html`<${Pill} kind="warn">all-or-nothing<//>` : html`<${Pill} kind="neutral">can be elected separately<//>`}</div>
@@ -978,7 +1062,7 @@ function TermCard({ t, words, showLp = true, extra }) {
 }
 
 /* ---------------- Search ---------------- */
-const emptyFilter = () => ({ categories: [], lpIds: [], lpTypes: [], vehicles: [], mfnStatus: [], lpStatusBased: [], obligation: [], feeBelow: null, feeAbove: null, hasExpiry: null, inBundle: null, text: "", includeDrafts: false, includeSuperseded: false });
+const emptyFilter = () => ({ categories: [], lpIds: [], lpTypes: [], vehicles: [], mfnStatus: [], grantBasis: [], obligation: [], feeBelow: null, feeAbove: null, hasExpiry: null, inBundle: null, text: "", includeDrafts: false, includeSuperseded: false });
 function applyFilter(f, s) {
   const lpById = Object.fromEntries(s.lps.map((l) => [l.id, l]));
   const text = (f.text || "").trim().toLowerCase();
@@ -991,7 +1075,10 @@ function applyFilter(f, s) {
     if (f.lpTypes?.length && !f.lpTypes.includes(lpById[t.lpId]?.type)) return false;
     if (f.vehicles?.length && !f.vehicles.includes(t.vehicle)) return false;
     if (f.mfnStatus?.length && !f.mfnStatus.includes(t.mfnStatus)) return false;
-    if (f.lpStatusBased?.length && !f.lpStatusBased.includes(t.lpStatusBased)) return false;
+    if (f.grantBasis?.length) {
+      const b = C.grantBasesOf(t) ?? (t.lpStatusBased === "yes" ? ["lp_status"] : []);
+      if (!f.grantBasis.some((x) => b.includes(x))) return false;
+    }
     if (f.obligation?.length && !f.obligation.includes(t.obligation?.is)) return false;
     if (f.feeBelow != null && !(t.feeRatePct != null && t.feeRatePct < f.feeBelow)) return false;
     if (f.feeAbove != null && !(t.feeRatePct != null && t.feeRatePct > f.feeAbove)) return false;
@@ -1012,7 +1099,7 @@ function describeFilter(f) {
   if (f.lpTypes?.length) out.push("LP type is " + list(f.lpTypes, (x) => LP_TYPES[x] || x));
   if (f.vehicles?.length) out.push("Vehicle is " + f.vehicles.join(" or "));
   if (f.mfnStatus?.length) out.push("MFN status is " + f.mfnStatus.join(" or "));
-  if (f.lpStatusBased?.length) out.push("LP-status based is " + f.lpStatusBased.join(" or "));
+  if (f.grantBasis?.length) out.push("Granted for " + f.grantBasis.map(C.grantBasisLabel).join(" or ").toLowerCase());
   if (f.obligation?.length) out.push("Ongoing obligation is " + f.obligation.join(" or "));
   if (f.feeBelow != null) out.push(`Fee rate below ${f.feeBelow}%`);
   if (f.feeAbove != null) out.push(`Fee rate above ${f.feeAbove}%`);
@@ -1030,7 +1117,7 @@ function sanitizeFilter(raw) {
   f.lpTypes = arr(raw.lpTypes, Object.keys(LP_TYPES), "LP type");
   f.vehicles = arr(raw.vehicles, s.config?.vehicles || [], "vehicle");
   f.mfnStatus = arr(raw.mfnStatus, ["electable", "excluded", "unclear"], "MFN status");
-  f.lpStatusBased = arr(raw.lpStatusBased, ["yes", "no", "unclear"], "LP-status value");
+  f.grantBasis = arr(raw.grantBasis, C.GRANT_BASES.map((x) => x[0]), "grant basis");
   f.obligation = arr(raw.obligation, ["yes", "no", "unclear"], "obligation value");
   const n = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
   f.feeBelow = n(raw.feeBelow); f.feeAbove = n(raw.feeAbove);
@@ -1048,7 +1135,7 @@ function keywordCrossCheck(f, keywords, results, s) {
     const cov = C.coverage(l, s.terms);
     (l.paragraphs || []).forEach((p, i) => {
       const n = i + 1; const low = p.toLowerCase();
-      const found = words.filter((w) => new RegExp("(^|[^a-z0-9])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(low));
+      const found = words.filter((w) => new RegExp("(^|[^a-z0-9])" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(s|es)?([^a-z0-9]|$)", "i").test(low));
       if (!found.length || res.has(l.id + "#" + n)) return;
       const row = cov.rows[i];
       let why;
@@ -1083,6 +1170,21 @@ function SearchView() {
     return keywordCrossCheck(f, words, results, s);
   }, [f, ai, results, s.letters, s.terms]);
   const hl = useMemo(() => [...(f.text ? [f.text] : [])], [f.text]);
+  /* Approved terms whose paragraphs the keyword cross-check found join the results, so a term filed under an
+     unexpected category still answers the question. Hits on drafts and unlinked paragraphs stay in the cross-check. */
+  const added = useMemo(() => {
+    const ids = new Set(results.map((t) => t.id)); const out = [];
+    for (const h of kw.hits) {
+      if (h.letter.status !== "approved") continue;
+      for (const t of s.terms) {
+        if (t.letterId !== h.letter.id || t.status !== "approved" || ids.has(t.id) || !(t.paragraphs || []).includes(h.n)) continue;
+        ids.add(t.id); out.push({ t, h });
+      }
+    }
+    return out;
+  }, [kw, results, s.terms]);
+  const addedParas = new Set(added.map((x) => x.h.letter.id + "#" + x.h.n));
+  const restHits = kw.hits.filter((h) => !addedParas.has(h.letter.id + "#" + h.n));
 
   async function ask(question) {
     const text = (question ?? q).trim(); if (!text) return;
@@ -1096,13 +1198,14 @@ Category ids: ${cats}
 LPs (id = name, type, commitment): ${s.lps.map((l) => `${l.id} = ${l.name}, ${l.type}, ${C.usd(l.commitmentUsd)}`).join("; ")}
 LP types: ${Object.keys(LP_TYPES).join(", ")}
 Vehicles: ${(s.config?.vehicles || []).join("; ")}
-Term fields: mfnStatus (electable|excluded|unclear), lpStatusBased (yes|no|unclear: term exists because of the LP's legal status), obligation (yes|no|unclear: an ongoing duty for the fund), feeRatePct (the LP's management fee rate in percent where a term sets it; standard is ${s.config?.fund?.standardFeePct ?? 1.5}), expiry, bundle membership.
+Term fields: mfnStatus (electable|excluded|unclear), grantBasis (list of size|closing|lp_status|anchor: why the term was granted; lp_status = it exists because of the LP's legal status), obligation (yes|no|unclear: an ongoing duty for the fund to deliver something or give notice), feeRatePct (the LP's management fee rate in percent where a term sets it; standard is ${s.config?.fund?.standardFeePct ?? 1.5}), expiry, bundle membership.
 
 Question: ${text}
 
 Reply with only JSON:
-{"explanation":"one sentence saying what the filter selects","filter":{"categories":[],"lpIds":[],"lpTypes":[],"vehicles":[],"mfnStatus":[],"lpStatusBased":[],"obligation":[],"feeBelow":null,"feeAbove":null,"hasExpiry":null,"inBundle":null,"text":""},"keywords":["5 to 12 words or short phrases to scan the full text of every letter for, as a cross-check"]}
-An empty list means any value. feeBelow and feeAbove are strict percentages. Use "text" only when no structured field fits, with one short word or phrase.`;
+{"explanation":"one sentence saying what the filter selects","filter":{"categories":[],"lpIds":[],"lpTypes":[],"vehicles":[],"mfnStatus":[],"grantBasis":[],"obligation":[],"feeBelow":null,"feeAbove":null,"hasExpiry":null,"inBundle":null,"text":""},"keywords":["5 to 12 words or short phrases to scan the full text of every letter for, as a cross-check"]}
+An empty list means any value. feeBelow and feeAbove are strict percentages.
+Questions about reports, reporting, statements, notices, information or data the fund must deliver, or deadlines: set obligation to ["yes"] and leave categories empty unless the question names another subject (such as fees). Reports are often filed under ESG, Other or Fees rather than Reporting, so never filter them by category alone. Use "text" only when no structured field fits, with one short word or phrase.`;
     try {
       const r = await callModel(prompt);
       const { f: nf, warn } = sanitizeFilter(r.json?.filter || {});
@@ -1142,7 +1245,7 @@ An empty list means any value. feeBelow and feeAbove are strict percentages. Use
       <${Field} label="LP type" wide><${Toggles} values=${f.lpTypes} options=${Object.entries(LP_TYPES)} onChange=${upd("lpTypes")} /><//>
       <${Field} label="Vehicle" wide><${Toggles} values=${f.vehicles} options=${(s.config?.vehicles || []).map((v) => [v, v])} onChange=${upd("vehicles")} /><//>
       <${Field} label="MFN status"><${Toggles} values=${f.mfnStatus} options=${[["electable", "Electable"], ["excluded", "Excluded"], ["unclear", "Unclear"]]} onChange=${upd("mfnStatus")} /><//>
-      <${Field} label="LP-status based"><${Toggles} values=${f.lpStatusBased} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} onChange=${upd("lpStatusBased")} /><//>
+      <${Field} label="Granted for"><${Toggles} values=${f.grantBasis} options=${C.GRANT_BASES} onChange=${upd("grantBasis")} /><//>
       <${Field} label="Ongoing obligation"><${Toggles} values=${f.obligation} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} onChange=${upd("obligation")} /><//>
       <${Field} label="Fee rate below (%)"><input id="fee-below" type="number" step="0.01" value=${f.feeBelow ?? ""} onInput=${(e) => upd("feeBelow")(e.target.value === "" ? null : Number(e.target.value))} /><//>
       <${Field} label="Fee rate above (%)"><input id="fee-above" type="number" step="0.01" value=${f.feeAbove ?? ""} onInput=${(e) => upd("feeAbove")(e.target.value === "" ? null : Number(e.target.value))} /><//>
@@ -1156,18 +1259,21 @@ An empty list means any value. feeBelow and feeAbove are strict percentages. Use
     </div>` : null}
 
     <div class="results-head">
-      <h2><span class="num">${results.length}</span> ${results.length === 1 ? "term matches" : "terms match"}</h2>
+      <h2><span class="num">${results.length + added.length}</span> ${results.length + added.length === 1 ? "term matches" : "terms match"}</h2>
       <span class="muted small">Counted from all ${s.terms.filter((t) => t.status === "approved").length} approved terms across ${s.letters.length} side letters</span>
     </div>
     ${ai?.status === "run" ? html`<p class="note">Asking ${s.config?.model?.pinned} to turn your question into a filter…</p>` : null}
-    <div class="results">${results.length ? results.map((t) => html`<${TermCard} key=${t.id} t=${t} words=${hl} />`) : html`<${Empty} title="No terms match this filter">Loosen the filter, or check the keyword cross-check below.<//>`}</div>
+    <div class="results">${results.length + added.length ? [
+      ...results.map((t) => html`<${TermCard} key=${t.id} t=${t} words=${hl} />`),
+      ...added.map(({ t, h }) => html`<${TermCard} key=${t.id} t=${t} words=${h.found} extra=${html`<p class="small muted">Added by keyword match: ¶ ${h.n} mentions ${h.found.map((w) => `"${w}"`).join(", ")}. Filed as ${catName(t.category)}.</p>`} />`),
+    ] : html`<${Empty} title="No terms match this filter">Loosen the filter, or check the keyword cross-check below.<//>`}</div>
 
     <section class="crosscheck card">
       <h3>Keyword cross-check</h3>
       <p class="muted small">Scans the full text of every side letter for the words below, including letters still in review, and lists any paragraph that is not already in the results. These are the places a term may have been filed under the wrong category or missed.</p>
       ${kw.words.length ? html`<div class="fchips">${kw.words.map((w) => html`<span class="fchip mono">${w}</span>`)}</div>` : html`<p class="muted small">No keywords yet: ask a question or pick a category.</p>`}
-      ${kw.words.length ? (kw.hits.length ? html`<p><${Pill} kind="warn">${kw.hits.length} possible missed ${kw.hits.length === 1 ? "term" : "terms"}<//></p>
-        <ul class="hits">${kw.hits.map((h) => html`<li>
+      ${kw.words.length ? (restHits.length ? html`<p><${Pill} kind="warn">${restHits.length} possible missed ${restHits.length === 1 ? "term" : "terms"}<//></p>
+        <ul class="hits">${restHits.map((h) => html`<li>
           <div class="hit-h"><a href=${"#letter-" + h.letter.id}>${lpName(h.letter.lpId)} · ¶ ${h.n}</a> <span class="muted small">${h.why}</span></div>
           <p class="hit-t"><${Highlight} text=${h.text} words=${h.found} /></p></li>`)}</ul>`
         : html`<p><${Pill} kind="ok">Every paragraph containing these words is in the results<//></p>`) : null}
@@ -1194,6 +1300,8 @@ function LettersView() {
         <td class="num">${c.approved}/${c.terms}</td><td><${StatusPill} status=${l.status} /></td>
         <td>${c.flags ? html`<${Pill} kind="warn">${c.flags}<//>` : html`<span class="muted">—</span>`}</td></tr>`; })}</tbody>
     </table></div>
+    ${(() => { const arch = s.all.letters.filter((l) => !s.letters.some((x) => x.id === l.id)); return arch.length ? html`<details class="card"><summary>${arch.length} archived side ${arch.length === 1 ? "letter" : "letters"}</summary>
+      <ul class="small">${arch.map((l) => html`<li key=${l.id}><a href=${"#letter-" + l.id}>${lpName(l.lpId)}</a> · ${l.title} · ${l.archived ? `archived ${fmtTime(l.archived.at)}` : "its LP is archived"}${l.archived ? html` <${RestoreButton} col="letters" rec=${l} label=${lpName(l.lpId) + "'s letter"} />` : null}</li>`)}</ul></details>` : null; })()}
   </section>`;
 }
 
@@ -1236,12 +1344,13 @@ function IntegrityBox({ letter }) {
 
 function LetterDetail({ id }) {
   const s = useStore();
-  const l = s.letters.find((x) => x.id === id);
+  const l = s.all.letters.find((x) => x.id === id);
   const [supersede, setSupersede] = useState(null);
   if (!l) return html`<section class="view"><${Empty} title="Side letter not found">It may still be loading. <a href="#letters">Back to side letters</a><//></section>`;
-  const lp = s.lps.find((x) => x.id === l.lpId);
-  const terms = s.terms.filter((t) => t.letterId === l.id);
-  const cov = C.coverage(l, s.terms);
+  const lp = s.all.lps.find((x) => x.id === l.lpId);
+  const terms = s.all.terms.filter((t) => t.letterId === l.id);
+  const cov = C.coverage(l, s.all.terms);
+  const archivedNote = l.archived ? `This side letter was archived ${fmtTime(l.archived.at)} by ${nameOf(l.archived.by)}${l.archived.reason ? ": " + l.archived.reason : ""}. Its terms are out of search, alerts and worksheets.` : lp?.archived ? `${lp.name} is archived, so this letter and its terms are out of search, alerts and worksheets.` : null;
   async function doSupersede(t, reason) {
     await act("Marking superseded", async () => {
       await patch("terms/" + t.id, { status: "superseded", supersededReason: reason, supersededAt: new Date().toISOString(), supersededBy: RT.meId });
@@ -1252,13 +1361,14 @@ function LetterDetail({ id }) {
   return html`<section class="view">
     <a class="back" href="#letters">← Side letters</a>
     <div class="view-h"><div><h1>${lp?.name || "Unknown LP"}</h1><p class="muted">${l.title} · signed ${fmtDate(l.signedDate)} · ${l.vehicle} · ${LP_TYPES[lp?.type] || ""} · ${C.usd(lp?.commitmentUsd)}</p></div>
-      <div class="row"><${StatusPill} status=${l.status} />${l.status === "needs_review" || l.status === "failed" ? html`<button class="btn primary" onClick=${() => go("#review-" + l.id)}>Open review</button>` : null}</div></div>
+      <div class="row">${l.archived ? html`<${RestoreButton} col="letters" rec=${l} label=${(lp?.name || "this LP") + "'s letter"} />` : !lp?.archived ? html`<${ArchiveButton} col="letters" rec=${l} label=${(lp?.name || "this LP") + "'s letter"} />` : null}<${StatusPill} status=${l.status} />${!archivedNote && (l.status === "needs_review" || l.status === "failed") ? html`<button class="btn primary" onClick=${() => go("#review-" + l.id)}>Open review</button>` : null}</div></div>
+    ${archivedNote ? html`<div class="note warn">${archivedNote}</div>` : null}
     ${l.status === "failed" ? html`<div class="note bad">Extraction failed: ${l.extraction?.error || "unknown error"}. Open the review to retry or enter the terms by hand.</div>` : null}
     <${IntegrityBox} letter=${l} />
     <div class="two">
       <div class="card"><h3>Letter text</h3>
         <ol class="paras">${(l.paragraphs || []).map((p, i) => { const row = cov.rows[i]; return html`<li class=${"para p-" + row.state}>
-          <span class="pn">¶ ${i + 1}</span><div><p>${p}</p><div class="small muted">${row.state === "term" ? row.termIds.map((tid) => catName(s.terms.find((t) => t.id === tid)?.category)).join(", ") : row.state === "none" ? "No obligation" : html`<${Pill} kind="warn">Not linked to a term<//>`}</div></div></li>`; })}</ol>
+          <span class="pn">¶ ${i + 1}</span><div><p>${p}</p><div class="small muted">${row.state === "term" ? row.termIds.map((tid) => catName(s.all.terms.find((t) => t.id === tid)?.category)).join(", ") : row.state === "none" ? "No obligation" : html`<${Pill} kind="warn">Not linked to a term<//>`}</div></div></li>`; })}</ol>
         ${l.source === "manual" ? html`<p class="muted">No letter text: terms entered by hand.</p>` : null}
       </div>
       <div class="stack">
@@ -1385,7 +1495,7 @@ function IntakeView() {
 
 /* ===== UI part 2: review and approval, MFN, LPs ===== */
 
-const TERM_FIELDS = ["category", "summary", "quote", "paragraphs", "vehicle", "conditions", "expiry", "lpStatusBased", "mfnStatus", "mfnReason", "obligation", "feeRatePct", "carryPct", "bundleId"];
+const TERM_FIELDS = ["category", "summary", "quote", "paragraphs", "vehicle", "conditions", "expiry", "grantBasis", "mfnStatus", "mfnReason", "obligation", "feeRatePct", "carryPct", "bundleId"];
 function diffTerm(a, b) {
   const ch = {};
   for (const k of TERM_FIELDS) if (C.canon(a[k] ?? null) !== C.canon(b[k] ?? null)) ch[k] = { before: a[k] ?? null, after: b[k] ?? null };
@@ -1397,6 +1507,7 @@ function approvalBlockers(t, letter) {
   if (t.mfnStatus !== "electable" && t.mfnStatus !== "excluded") out.push("Set MFN status to electable or excluded");
   else if (!String(t.mfnReason || "").trim()) out.push("Give a reason for the MFN status");
   if (t.category === C.UNCLEAR) out.push("Choose a category");
+  if (!Array.isArray(t.grantBasis)) out.push('Set the grant basis (or "None of these")');
   if (!String(t.summary || "").trim() || t.summary === C.UNCLEAR) out.push("Write a summary");
   const open = (letter?.secondPass?.issues || []).filter((i) => !i.resolved && i.termId === t.id);
   if (open.length) out.push("Resolve the second-pass issue on this term");
@@ -1439,7 +1550,7 @@ async function saveTerm({ original, draft, letter, newBundle, approve, auditActi
 
 function TermEditor({ t, letter, onDone, isNew, seed }) {
   const s = useStore();
-  const base = t || { category: C.UNCLEAR, summary: "", quote: "", paragraphs: [], vehicle: letter.vehicle, conditions: "None", expiry: "None", lpStatusBased: "no", mfnStatus: C.UNCLEAR, mfnReason: "", obligation: { is: "no", deadline: "" }, feeRatePct: null, carryPct: null, bundleId: null, ...(seed || {}) };
+  const base = t || { category: C.UNCLEAR, summary: "", quote: "", paragraphs: [], vehicle: letter.vehicle, conditions: "None", expiry: "None", grantBasis: C.UNCLEAR, mfnStatus: C.UNCLEAR, mfnReason: "", obligation: { is: "no", deadline: "" }, feeRatePct: null, carryPct: null, bundleId: null, ...(seed || {}) };
   const [d, setD] = useState({ ...base, obligation: { ...(base.obligation || {}) } });
   const [paraText, setParaText] = useState((base.paragraphs || []).join(", "));
   const [nb, setNb] = useState({ name: "", allOrNothing: true, note: "" });
@@ -1497,7 +1608,7 @@ function TermEditor({ t, letter, onDone, isNew, seed }) {
       <${Field} label="Fund or vehicle"><select id=${"veh-" + (t?.id || "new")} value=${d.vehicle} onChange=${(e) => up("vehicle", e.target.value)}><option value="unclear">Unclear</option>${vehicles.map((v) => html`<option value=${v}>${v}</option>`)}</select><//>
       <${Field} label="Conditions attached" hint='"None" if none'><input id=${"con-" + (t?.id || "new")} type="text" value=${d.conditions} onInput=${(e) => up("conditions", e.target.value)} /><//>
       <${Field} label="Expiry date or trigger" hint='"None" if none'><input id=${"exp-" + (t?.id || "new")} type="text" value=${d.expiry} onInput=${(e) => up("expiry", e.target.value)} /><//>
-      <${Field} label="LP-status based"><${Seg} value=${d.lpStatusBased} onChange=${(v) => up("lpStatusBased", v)} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} /><//>
+      <${Field} label="Granted for" hint="Why the fund gave it; MFN carve-outs use this"><${GrantBasisField} id=${"gb-" + (t?.id || "new")} value=${d.grantBasis} onChange=${(v) => up("grantBasis", v)} /><//>
       <${Field} label="MFN status"><${Seg} value=${d.mfnStatus} onChange=${(v) => up("mfnStatus", v)} options=${[["electable", "Electable"], ["excluded", "Excluded"], ["unclear", "Unclear"]]} /><//>
       <${Field} label="MFN reason"><input id=${"mfr-" + (t?.id || "new")} type="text" value=${d.mfnReason} onInput=${(e) => up("mfnReason", e.target.value)} /><//>
       <${Field} label="Ongoing obligation for the fund"><${Seg} value=${d.obligation?.is} onChange=${(v) => up("obligation", { ...d.obligation, is: v })} options=${[["yes", "Yes"], ["no", "No"], ["unclear", "Unclear"]]} /><//>
@@ -1534,12 +1645,167 @@ function IssueResolver({ iss, onResolve, disabled }) {
       <button class="btn" type="submit" disabled=${disabled || !note.trim()}>Mark resolved</button></form></div>`;
 }
 
+/* ---- Letter vs LP record (B3) ---- */
+const normName = (x) => String(x || "").toLowerCase().replace(/[‘’']/g, "'").replace(/\bthe\b/g, "").replace(/[^a-z0-9']+/g, " ").trim();
+function factMismatches(l, lp) {
+  const f = l.facts; if (!f || !lp) return [];
+  const out = [];
+  if (f.commitmentUsd != null && f.commitmentUsd !== lp.commitmentUsd) out.push({ key: "commitment", label: "Commitment", letter: C.usd(f.commitmentUsd), record: C.usd(lp.commitmentUsd), lpFix: { commitmentUsd: f.commitmentUsd } });
+  if (f.legalName && normName(f.legalName) !== normName(lp.name)) out.push({ key: "name", label: "Legal name", letter: f.legalName, record: lp.name, lpFix: { name: f.legalName } });
+  if (f.letterDate && l.signedDate && f.letterDate !== l.signedDate) out.push({ key: "date", label: "Letter date", letter: fmtDate(f.letterDate), record: fmtDate(l.signedDate) + " (signed date on file)", letterFix: { signedDate: f.letterDate } });
+  if (f.closing && normName(f.closing) !== normName(lp.close)) out.push({ key: "closing", label: "Closing", letter: f.closing, record: lp.close || "—", lpFix: { close: f.closing } });
+  return out;
+}
+/* A mismatch stays open until it is fixed on the record or overridden with a note for the same letter value. */
+function openMismatches(l, lp) {
+  const checks = l.factChecks || {};
+  return factMismatches(l, lp).filter((m) => !(checks[m.key] && checks[m.key].letter === m.letter && checks[m.key].status === "overridden"));
+}
+
+function LetterFactsCard({ l }) {
+  const s = useStore();
+  const lp = s.all.lps.find((x) => x.id === l.lpId);
+  const [notes, setNotes] = useState({});
+  const [mfn, setMfn] = useState(null);
+  const [reading, setReading] = useState(false);
+  const p = l.mfnProposal;
+  useEffect(() => { setMfn(p ? { excludedCategories: p.excludedCategories || [], excludedGrantBases: p.excludedGrantBases || [], basis: p.basis, thresholdM: p.thresholdUsd != null ? p.thresholdUsd / 1e6 : "", note: p.note || "", hasMfn: !!p.hasMfn } : null); }, [p && C.canon(p)]);
+  if (l.source === "manual") return null;
+  const all = factMismatches(l, lp); const open = openMismatches(l, lp);
+  async function read() {
+    setReading(true);
+    await act("Reading letter facts", async () => { await readLetterFacts(l.id); toast("ok", "Letter facts and MFN clause read."); });
+    setReading(false);
+  }
+  async function fixRecord(m) {
+    await act("Updating the record", async () => {
+      if (m.lpFix) { await patch("lps/" + lp.id, m.lpFix); }
+      if (m.letterFix) { await patch("letters/" + l.id, m.letterFix); }
+      await patch("letters/" + l.id, { factChecks: { ...(l.factChecks || {}), [m.key]: { status: "fixed", letter: m.letter, record: m.record, by: RT.meId, at: new Date().toISOString() } } });
+      await appendAudit(m.lpFix ? "lp.updated_from_letter" : "letter.updated_from_text", m.lpFix ? "lp" : "letter", m.lpFix ? lp.id : l.id, `${m.label} for ${lp.name} changed from ${m.record} to ${m.letter} to match the side letter`, { field: m.key, before: m.record, after: m.letter, letterId: l.id });
+    });
+  }
+  async function override(m) {
+    const note = (notes[m.key] || "").trim(); if (!note) return;
+    await act("Saving override", async () => {
+      await patch("letters/" + l.id, { factChecks: { ...(l.factChecks || {}), [m.key]: { status: "overridden", note, letter: m.letter, record: m.record, by: RT.meId, at: new Date().toISOString() } } });
+      await appendAudit("letter.fact_overridden", "letter", l.id, `Kept the record's ${m.label.toLowerCase()} (${m.record}) although the letter says ${m.letter}: ${note}`, { field: m.key, note });
+    });
+  }
+  async function confirmMfn() {
+    await act("Confirming MFN carve-outs", async () => {
+      const conf = { ...p, hasMfn: mfn.hasMfn, basis: mfn.basis, thresholdUsd: mfn.thresholdM === "" || mfn.thresholdM == null ? null : Math.round(Number(mfn.thresholdM) * 1e6), excludedCategories: mfn.excludedCategories, excludedGrantBases: mfn.excludedGrantBases, note: mfn.note, confirmed: true, confirmedBy: RT.meId, confirmedAt: new Date().toISOString() };
+      await patch("letters/" + l.id, { mfnProposal: conf });
+      await appendAudit("letter.mfn_confirmed", "letter", l.id, `Confirmed MFN clause settings for ${lp.name}: ${conf.hasMfn ? mfnSummary({ commitmentUsd: lp.commitmentUsd, mfn: conf }) : "no MFN clause"}`, { proposed: { excludedCategories: p.excludedCategories, excludedGrantBases: p.excludedGrantBases, basis: p.basis }, confirmed: { excludedCategories: conf.excludedCategories, excludedGrantBases: conf.excludedGrantBases, basis: conf.basis, thresholdUsd: conf.thresholdUsd } });
+    });
+  }
+  return html`<div class="card"><h3>Letter vs LP record, and MFN clause</h3>
+    ${!l.facts ? html`<p class="small">The letter's commitment, legal name, date, closing and MFN clause haven't been read yet. They must be checked before this review can finish.</p>
+      <div class="row"><button class="btn primary" disabled=${s.readOnly || reading || !RT.sample} onClick=${read}>${reading ? "Reading…" : "Read letter facts and MFN clause"}</button>${!RT.sample ? html`<span class="small muted">Needs Claude, which is not available in this view.</span>` : null}</div>` : html`
+      ${all.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>Field</th><th>Letter says</th><th>LP record says</th><th></th></tr></thead><tbody>
+        ${all.map((m) => { const ov = (l.factChecks || {})[m.key]; const done = ov && ov.letter === m.letter && ov.status === "overridden"; return html`<tr key=${m.key}><td>${m.label}</td><td>${m.letter}</td><td>${m.record}</td>
+          <td>${done ? html`<span class="small">Kept the record: ${ov.note}</span>` : html`<div class="row"><button class="btn small" disabled=${s.readOnly} onClick=${() => fixRecord(m)}>Use the letter's value</button>
+            <input id=${"ov-" + m.key} type="text" placeholder="Or: why the record is right" value=${notes[m.key] || ""} onInput=${(e) => setNotes({ ...notes, [m.key]: e.target.value })} />
+            <button class="btn small ghost" disabled=${s.readOnly || !(notes[m.key] || "").trim()} onClick=${() => override(m)}>Keep the record</button></div>`}</td></tr>`; })}
+      </tbody></table></div>` : html`<p class="small">Commitment, legal name, letter date and closing match the LP record (or the letter doesn't state them).</p>`}
+      ${p && mfn ? html`<div class="mfnconf">
+        <p class="small"><strong>MFN clause</strong> ${p.paragraphs?.length ? html`<span class="muted">¶ ${p.paragraphs.join(", ")}</span>` : null} ${p.confirmed ? html`<span class="muted"> · confirmed by ${nameOf(p.confirmedBy)} ${fmtTime(p.confirmedAt)}</span>` : html`<span class="muted"> · drafted by ${p.modelApplied || p.model}; check against the letter, then confirm</span>`}</p>
+        ${p.quote ? html`<${Clause} text=${p.quote} n=${p.paragraphs} />` : null}
+        <fieldset disabled=${s.readOnly || p.confirmed}><div class="grid2">
+          <${Field} label="Has an MFN clause"><${Seg} value=${mfn.hasMfn} onChange=${(v) => setMfn({ ...mfn, hasMfn: v })} options=${[[true, "Yes"], [false, "No"]]} /><//>
+          ${mfn.hasMfn ? html`<${Field} label="MFN basis" wide><${Seg} value=${mfn.basis} onChange=${(v) => setMfn({ ...mfn, basis: v })} options=${[["size", "LPs at or below a commitment limit"], ["all", "All LPs' terms"], ["manual", "Case by case"]]} /><//>
+            ${mfn.basis === "size" ? html`<${Field} label="Commitment limit ($M)" hint="Blank = this LP's own commitment"><input id="mc-thr" type="number" value=${mfn.thresholdM} onInput=${(e) => setMfn({ ...mfn, thresholdM: e.target.value })} /><//>` : null}
+            <${Field} label="Carve-outs by category" wide><${Toggles} values=${mfn.excludedCategories} options=${categoryList().map((c) => [c.id, c.name])} onChange=${(v) => setMfn({ ...mfn, excludedCategories: v })} /><//>
+            <${Field} label="Carve-outs by grant basis" wide><${Toggles} values=${mfn.excludedGrantBases} options=${C.GRANT_BASES} onChange=${(v) => setMfn({ ...mfn, excludedGrantBases: v })} /><//>
+            <${Field} label="Other limits" wide><input id="mc-note" type="text" value=${mfn.note} onInput=${(e) => setMfn({ ...mfn, note: e.target.value })} /><//>` : null}
+        </div></fieldset>
+        ${!p.confirmed ? html`<div class="row end"><button class="btn primary" disabled=${s.readOnly} onClick=${confirmMfn}>Confirm MFN settings</button></div>` : html`<p class="small muted">Written to ${lp.name}'s LP record when the review finishes.</p>`}
+      </div>` : null}
+      <div class="row"><button class="btn small ghost" disabled=${s.readOnly || reading || !RT.sample} onClick=${read}>${reading ? "Reading…" : "Read the letter again"}</button>${open.length ? html`<span class="small bad-text">${open.length} ${open.length === 1 ? "mismatch" : "mismatches"} to resolve before finishing.</span>` : null}</div>`}
+  </div>`;
+}
+
+/* ---- Grant basis backfill for terms approved before grant bases existed ---- */
+async function proposeGrantBases(onProgress) {
+  const s = store.state;
+  const need = s.terms.filter((t) => t.status === "approved" && C.grantBasesOf(t) == null && !t.grantBasisProposal);
+  const byLetter = {}; for (const t of need) (byLetter[t.letterId] = byLetter[t.letterId] || []).push(t);
+  const letters = Object.keys(byLetter).map((id) => s.letters.find((l) => l.id === id)).filter(Boolean);
+  let done = 0, made = 0;
+  for (const l of letters) {
+    const terms = byLetter[l.id];
+    const prompt = `For each term already approved from this side letter of a private infrastructure fund, say why the fund granted it.
+Grant bases: "size" (tied to the size of the investor's commitment), "closing" (tied to when the investor was admitted, such as the first or initial closing), "lp_status" (exists because of what the investor legally is: public-records laws, sovereign immunity, ERISA plan assets, insurance regulation, fund-of-funds look-through, state investment policies), "anchor" (granted as part of an anchor or cornerstone package). Use [] when none applies; several can apply. Base the answer on the letter's words only.
+
+Side letter, numbered paragraphs:
+${(l.paragraphs || []).map((p, i) => `[${i + 1}] ${p}`).join("\n")}
+
+Terms (index: summary | paragraphs | conditions):
+${terms.map((t, i) => `${i}: ${t.summary} | ¶ ${(t.paragraphs || []).join(", ")} | ${t.conditions}`).join("\n")}
+
+Reply with only JSON: {"terms":[{"index":<n>,"grantBasis":[...],"reason":"one short sentence citing the paragraph"}]}`;
+    try {
+      const r = await callModel(prompt);
+      const rows = Array.isArray(r.json?.terms) ? r.json.terms : [];
+      for (const row of rows) {
+        const t = terms[Number(row.index)]; const b = C.normGrantBases(row.grantBasis);
+        if (!t || !Array.isArray(b)) continue;
+        await patch("terms/" + t.id, { grantBasisProposal: { bases: b, reason: String(row.reason || "").trim(), model: r.model, modelApplied: r.modelApplied, at: new Date().toISOString(), by: RT.meId } });
+        made++;
+      }
+      await appendAudit("term.grant_basis_proposed", "letter", l.id, `Drafted grant bases for ${rows.length} approved ${lpName(l.lpId)} terms`, { model: r.model, modelApplied: r.modelApplied, terms: rows.map((x) => ({ termId: terms[Number(x.index)]?.id, grantBasis: x.grantBasis })) });
+    } catch (e) { toast("bad", `${lpName(l.lpId)}: ${errText(e)}`); }
+    done++; onProgress && onProgress(done, letters.length);
+  }
+  return made;
+}
+
+function GrantBasisProposals() {
+  const s = useStore();
+  const [edits, setEdits] = useState({});
+  const [running, setRunning] = useState(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const unset = s.terms.filter((t) => t.status === "approved" && C.grantBasesOf(t) == null);
+  const pending = unset.filter((t) => t.grantBasisProposal);
+  const notYet = unset.filter((t) => !t.grantBasisProposal);
+  if (!unset.length) return null;
+  async function run() {
+    setRunning([0, 0]);
+    await act("Drafting grant bases", async () => { const n = await proposeGrantBases((a, b) => setRunning([a, b])); toast("ok", `Drafted grant bases for ${n} terms. Approve each one below.`); });
+    setRunning(null);
+  }
+  const valueOf = (t) => edits[t.id] ?? t.grantBasisProposal.bases;
+  async function approve(list) {
+    await act("Saving grant bases", async () => {
+      for (const t of list) {
+        const b = valueOf(t);
+        await patch("terms/" + t.id, { grantBasis: b, grantBasisProposal: null, grantBasisSetBy: RT.meId, grantBasisSetAt: new Date().toISOString() });
+        await appendAudit("term.grant_basis_set", "term", t.id, `Set grant basis for ${lpName(t.lpId)} term "${t.summary}": ${b.length ? b.map(C.grantBasisLabel).join(", ") : "none"}`, { proposed: t.grantBasisProposal.bases, approved: b });
+      }
+      toast("ok", `${list.length} grant ${list.length === 1 ? "basis" : "bases"} saved.`); setConfirmAll(false);
+    });
+  }
+  return html`<div class="card"><h3>Grant basis for approved terms</h3>
+    <p class="small">${unset.length} approved ${unset.length === 1 ? "term has" : "terms have"} no grant basis, so election worksheets show them as "Needs a decision".${pending.length ? ` ${pending.length} drafted and waiting for approval.` : ""}</p>
+    ${notYet.length ? html`<div class="row"><button class="btn" disabled=${s.readOnly || !!running || !RT.sample} onClick=${run}>${running ? `Drafting… ${running[0]} of ${running[1] || "?"} letters` : `Draft grant bases for ${notYet.length} terms`}</button>${!RT.sample ? html`<span class="small muted">Needs Claude, which is not available in this view.</span>` : null}</div>` : null}
+    ${pending.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Term</th><th>Granted for</th><th>Why</th><th></th></tr></thead><tbody>
+      ${pending.map((t) => html`<tr key=${t.id}><td>${lpName(t.lpId)}</td><td class="small">${t.summary}</td>
+        <td><${Toggles} values=${valueOf(t)} options=${C.GRANT_BASES} onChange=${(v) => setEdits({ ...edits, [t.id]: v })} />${!valueOf(t).length ? html`<span class="small muted">None</span>` : null}</td>
+        <td class="small muted">${t.grantBasisProposal.reason}</td>
+        <td><button class="btn small" disabled=${s.readOnly} onClick=${() => approve([t])}>Approve</button></td></tr>`)}
+    </tbody></table></div>
+    <div class="row end">${confirmAll ? html`<span class="small">Approve all ${pending.length} as shown?</span><button class="btn primary" disabled=${s.readOnly} onClick=${() => approve(pending)}>Yes, approve ${pending.length}</button><button class="btn ghost" onClick=${() => setConfirmAll(false)}>Cancel</button>`
+      : html`<button class="btn" disabled=${s.readOnly} onClick=${() => setConfirmAll(true)}>Approve all ${pending.length} as shown</button>`}</div>` : null}
+  </div>`;
+}
+
 function ReviewList() {
   const s = useStore();
   const rows = s.letters.filter((l) => ["needs_review", "failed", "extracting", "pending"].includes(l.status));
   return html`<section class="view">
     <div class="view-h"><h1>Review queue</h1><button class="btn primary" onClick=${() => go("#add")} disabled=${s.readOnly}>Add a side letter</button></div>
     <p class="muted">Terms stay out of search until a person approves them. Flagged and unclear items are listed first on each letter.</p>
+    <${GrantBasisProposals} />
     ${rows.length ? html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Signed</th><th>Status</th><th>Draft terms</th><th>Flags</th><th></th></tr></thead><tbody>
       ${rows.map((l) => { const c = letterCounts(l, s); const drafts = s.terms.filter((t) => t.letterId === l.id && t.status === "draft").length; return html`<tr key=${l.id}>
         <td>${lpName(l.lpId)}</td><td class="num">${fmtDate(l.signedDate)}</td><td><${StatusPill} status=${l.status} /></td><td class="num">${drafts}</td>
@@ -1561,7 +1827,12 @@ function ReviewLetter({ id }) {
   const sorted = [...terms].sort((a, b) => rank(a) - rank(b));
   const drafts = terms.filter((t) => t.status === "draft");
   const openIssues = (l.secondPass?.issues || []).filter((i) => !i.resolved);
-  const canFinish = l.status === "needs_review" && !drafts.length && !cov.unaccounted.length && !openIssues.length && terms.some((t) => t.status === "approved");
+  const lpRec = s.all.lps.find((x) => x.id === l.lpId);
+  const factsNeeded = l.source !== "manual";
+  const mism = factsNeeded ? openMismatches(l, lpRec) : [];
+  const factsOk = !factsNeeded || (!!l.facts && !mism.length);
+  const mfnOk = !factsNeeded || (!!l.mfnProposal && l.mfnProposal.confirmed);
+  const canFinish = l.status === "needs_review" && !drafts.length && !cov.unaccounted.length && !openIssues.length && terms.some((t) => t.status === "approved") && factsOk && mfnOk;
 
   async function setNoObligation(n, on) {
     await act("Updating", async () => {
@@ -1580,6 +1851,13 @@ function ReviewLetter({ id }) {
   async function finish() {
     await act("Finishing review", async () => {
       await patch("letters/" + l.id, { status: "approved", reviewedBy: RT.meId, reviewedAt: new Date().toISOString() });
+      const mp = l.mfnProposal;
+      if (mp && mp.confirmed && lpRec) {
+        const before = lpRec.mfn || {};
+        const mfnNew = { hasMfn: mp.hasMfn, basis: mp.basis, thresholdUsd: mp.thresholdUsd ?? null, excludedCategories: mp.excludedCategories || [], excludedGrantBases: mp.excludedGrantBases || [], excludedTermIds: before.excludedTermIds || [], note: mp.note || "", fromLetterId: l.id };
+        await patch("lps/" + lpRec.id, { mfn: mfnNew });
+        await appendAudit("lp.mfn_from_letter", "lp", lpRec.id, `Set ${lpRec.name}'s MFN clause settings from its reviewed side letter: ${mp.hasMfn ? mfnSummary({ commitmentUsd: lpRec.commitmentUsd, mfn: mfnNew }) : "no MFN clause"}`, { before, after: mfnNew, letterId: l.id });
+      }
       await appendAudit("letter.reviewed", "letter", l.id, `Finished review of ${lpName(l.lpId)} side letter: ${terms.filter((t) => t.status === "approved").length} approved terms`, { approved: terms.filter((t) => t.status === "approved").map((t) => t.id) });
       toast("ok", "Review finished."); go("#letter-" + l.id);
     });
@@ -1597,7 +1875,10 @@ function ReviewLetter({ id }) {
       <div class=${drafts.length ? "todo" : "done"}><span class="dot"></span>${drafts.length ? `${drafts.length} draft ${drafts.length === 1 ? "term needs" : "terms need"} approval or rejection` : "Every term approved or rejected"}</div>
       <div class=${cov.unaccounted.length ? "todo" : "done"}><span class="dot"></span>${l.source === "manual" ? "No letter text (entered by hand)" : cov.unaccounted.length ? `${cov.unaccounted.length === 1 ? "Paragraph" : "Paragraphs"} ${cov.unaccounted.join(", ")} not linked to a term or marked "no obligation"` : "Every paragraph accounted for"}</div>
       <div class=${openIssues.length ? "todo" : "done"}><span class="dot"></span>${openIssues.length ? `${openIssues.length} second-pass ${openIssues.length === 1 ? "issue" : "issues"} open` : l.secondPass ? "Second-pass issues resolved" : "No second-pass check on record"}</div>
+      ${factsNeeded ? html`<div class=${factsOk ? "done" : "todo"}><span class="dot"></span>${!l.facts ? "Letter facts not read yet" : mism.length ? `${mism.length} letter vs LP record ${mism.length === 1 ? "mismatch" : "mismatches"} open` : "LP record matches the letter"}</div>
+      <div class=${mfnOk ? "done" : "todo"}><span class="dot"></span>${mfnOk ? "MFN clause settings confirmed" : "MFN clause settings not confirmed"}</div>` : null}
     </div>
+    <${LetterFactsCard} l=${l} />
 
     ${l.status === "failed" ? html`<div class="note bad">Extraction failed: ${l.extraction?.error || "unknown error"}.
       <div class="row">${l.paragraphs?.length && RT.sample ? html`<button class="btn" onClick=${doRetry} disabled=${s.readOnly}>Retry with ${s.config?.model?.pinned}</button>` : null}
@@ -1664,7 +1945,7 @@ const itemsHash = (items) => C.sha256Text(C.canon(items.map(({ key, termIds, sna
 function MfnView({ sub }) {
   return html`<section class="view">
     <div class="view-h"><h1>MFN</h1></div>
-    <nav class="subnav"><a class=${!sub ? "on" : ""} href="#mfn">Check a proposed term</a><a class=${sub === "packages" ? "on" : ""} href="#mfn-packages">Election packages</a><a class=${sub === "records" ? "on" : ""} href="#mfn-records">Election records</a></nav>
+    <nav class="subnav"><a class=${!sub ? "on" : ""} href="#mfn">Check a proposed term</a><a class=${sub === "packages" ? "on" : ""} href="#mfn-packages">Election worksheets</a><a class=${sub === "records" ? "on" : ""} href="#mfn-records">Election records</a></nav>
     ${!sub ? html`<${ProposedCheck} />` : sub === "packages" ? html`<${Packages} />` : html`<${Records} />`}
   </section>`;
 }
@@ -1672,7 +1953,7 @@ function MfnView({ sub }) {
 function EligTable({ rows }) {
   return html`<div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Commitment</th><th>MFN setup</th><th>Result</th><th>Why</th></tr></thead><tbody>
     ${rows.map((r) => html`<tr key=${r.lp.id}><td>${r.lp.name}</td><td class="num">${C.usd(r.lp.commitmentUsd)}</td><td class="small">${mfnSummary(r.lp)}</td>
-      <td>${r.status === "eligible" ? html`<${Pill} kind="bad">Could elect<//>` : r.status === "review" ? html`<${Pill} kind="warn">Needs a decision<//>` : html`<${Pill} kind="neutral">Not eligible<//>`}</td>
+      <td>${r.status === "eligible" ? html`<${Pill} kind="info">Could elect<//>` : r.status === "review" ? html`<${Pill} kind="warn">Needs a decision<//>` : html`<${Pill} kind="neutral">Not eligible<//>`}</td>
       <td class="small">${r.reasons.join(". ")}</td></tr>`)}
   </tbody></table></div>`;
 }
@@ -1680,7 +1961,7 @@ function mfnSummary(lp) {
   const m = lp.mfn || {};
   if (!m.hasMfn) return "No MFN";
   const base = m.basis === "all" ? "All terms" : m.basis === "manual" ? "Case by case" : `Size-based, limit ${C.usd(m.thresholdUsd ?? lp.commitmentUsd)}`;
-  const ex = (m.excludedCategories || []).map(catName);
+  const ex = [...(m.excludedCategories || []).map(catName), ...(m.excludedGrantBases || []).map((b) => C.grantBasisLabel(b).toLowerCase() + " terms")];
   return base + (ex.length ? `; excludes ${ex.join(", ")}` : "");
 }
 
@@ -1688,12 +1969,12 @@ function ProposedCheck() {
   const s = useStore();
   const [recv, setRecv] = useState("");
   const [nl, setNl] = useState({ name: "", commitment: "" });
-  const [form, setForm] = useState({ category: "fees", text: "", mfnStatus: "electable", mfnReason: "", bundleId: "" });
+  const [form, setForm] = useState({ category: "fees", text: "", mfnStatus: "electable", mfnReason: "", bundleId: "", grantBasis: [], conditions: "" });
   const [res, setRes] = useState(null);
   const receiving = recv === "new" ? { id: "proposed-lp", name: nl.name || "New LP", commitmentUsd: Number(nl.commitment) * 1e6 } : s.lps.find((l) => l.id === recv);
   const bundles = receiving ? s.bundles.filter((b) => b.lpId === receiving.id) : [];
   async function check() {
-    const proposed = { id: "proposed", category: form.category, summary: form.text, mfnStatus: form.mfnStatus, mfnReason: form.mfnReason || "Proposed" };
+    const proposed = { id: "proposed", category: form.category, summary: form.text, mfnStatus: form.mfnStatus, mfnReason: form.mfnReason || "Proposed", grantBasis: form.grantBasis, conditions: form.conditions.trim() || "None" };
     const bundle = form.bundleId ? s.bundles.find((b) => b.id === form.bundleId) : null;
     const group = bundle ? [...s.terms.filter((t) => bundle.termIds.includes(t.id) && C.isLive(t)), proposed] : [proposed];
     const rows = s.lps.filter((l) => l.id !== receiving.id).map((lp) => ({ lp, ...itemEligibility(lp, receiving, group, bundle && bundle.allOrNothing ? bundle : null) }))
@@ -1716,7 +1997,7 @@ Reply with only JSON: {"similar":[{"termId":"<id>","why":"one short phrase"}]}`;
     }
     setRes((p) => ({ ...p, similar }));
   }
-  const can = receiving && (recv !== "new" || Number(nl.commitment) > 0) && form.text.trim().length > 5;
+  const can = receiving && (recv !== "new" || Number(nl.commitment) > 0) && form.text.trim().length > 5 && Array.isArray(form.grantBasis);
   const counts = res ? { e: res.rows.filter((r) => r.status === "eligible").length, r: res.rows.filter((r) => r.status === "review").length } : null;
   return html`<div class="stack">
     <p class="muted">Before offering a term, see what similar terms you have already granted and which LPs could claim the new one through their MFN.</p>
@@ -1727,13 +2008,15 @@ Reply with only JSON: {"similar":[{"termId":"<id>","why":"one short phrase"}]}`;
         ${recv === "new" ? html`<${Field} label="LP name"><input id="pc-nn" type="text" value=${nl.name} onInput=${(e) => setNl({ ...nl, name: e.target.value })} /><//><${Field} label="Expected commitment ($M)"><input id="pc-nc" type="number" value=${nl.commitment} onInput=${(e) => setNl({ ...nl, commitment: e.target.value })} /><//>` : null}
         <${Field} label="The term you plan to offer" wide><textarea id="pc-text" rows="3" placeholder="e.g. Management fee reduced by 0.10% for commitments of $40M or more" value=${form.text} onInput=${(e) => setForm({ ...form, text: e.target.value })}></textarea><//>
         <${Field} label="Would it be electable under MFN?"><${Seg} value=${form.mfnStatus} onChange=${(v) => setForm({ ...form, mfnStatus: v })} options=${[["electable", "Electable"], ["excluded", "Excluded"]]} /><//>
+        <${Field} label="Granted for" hint="Carve-outs in other LPs' MFN clauses use this"><${GrantBasisField} id="pc-gb" value=${form.grantBasis} onChange=${(v) => setForm({ ...form, grantBasis: v })} /><//>
+        <${Field} label="Conditions" hint='e.g. "Commitment of $60M or more"; blank if none'><input id="pc-cond" type="text" value=${form.conditions} onInput=${(e) => setForm({ ...form, conditions: e.target.value })} /><//>
         <${Field} label="Part of a bundle"><select id="pc-bnd" value=${form.bundleId} onChange=${(e) => setForm({ ...form, bundleId: e.target.value })}><option value="">No</option>${bundles.map((b) => html`<option value=${b.id}>${b.name}</option>`)}</select><//>
       </div>
       <div class="row end"><button class="btn primary" disabled=${!can} onClick=${check}>Check</button></div>
     </div>
     ${res ? html`<div class="card">
       <h3>Who could claim it</h3>
-      <p>${counts.e ? html`<${Pill} kind="bad">${counts.e} ${counts.e === 1 ? "LP" : "LPs"} could elect this<//>` : html`<${Pill} kind="ok">No LP could elect this<//>`} ${counts.r ? html`<${Pill} kind="warn">${counts.r} need a decision<//>` : null}</p>
+      <p>${counts.e ? html`<${Pill} kind="info">${counts.e} ${counts.e === 1 ? "LP" : "LPs"} could elect this<//>` : html`<${Pill} kind="ok">No LP could elect this<//>`} ${counts.r ? html`<${Pill} kind="warn">${counts.r} need a decision<//>` : null}</p>
       ${res.bundle ? html`<div class="bundle-box"><strong>Checked as part of "${res.bundle.name}"${res.bundle.allOrNothing ? " (all-or-nothing)" : ""}</strong><ul>${res.group.map((t) => html`<li><${Pill} kind="cat">${catName(t.category)}<//> ${t.summary}</li>`)}</ul></div>` : null}
       <${EligTable} rows=${res.rows} />
       <p class="small muted">This flags LPs that might be able to claim the term. A person or counsel makes the final call.</p>
@@ -1750,28 +2033,68 @@ Reply with only JSON: {"similar":[{"termId":"<id>","why":"one short phrase"}]}`;
 function Packages() {
   const s = useStore();
   const withMfn = s.lps.filter((l) => l.mfn?.hasMfn);
-  async function generate(lps) {
-    await act("Generating packages", async () => {
-      for (const lp of lps) {
+  const inReview = s.letters.filter((l) => ["needs_review", "failed", "extracting", "pending"].includes(l.status));
+  const waitingIds = new Set(inReview.map((l) => l.lpId));
+  const ready = withMfn.filter((l) => !waitingIds.has(l.id));
+  const waiting = withMfn.filter((l) => waitingIds.has(l.id));
+  async function generate() {
+    await act("Generating worksheets", async () => {
+      for (const lp of waiting) {
+        const stale = s.elections.find((e) => e.lpId === lp.id && e.status === "draft");
+        if (!stale) continue;
+        await patch("elections/" + stale.id, { archived: { at: new Date().toISOString(), by: RT.meId, reason: "LP's side letter is in review" } });
+        await appendAudit("election.archived", "election", stale.id, `Archived ${lp.name}'s draft worksheet: its side letter is in review`, { reason: "letter in review" });
+      }
+      for (const lp of ready) {
         const existing = s.elections.find((e) => e.lpId === lp.id && e.status === "draft");
         const signed = s.elections.find((e) => e.lpId === lp.id && e.status !== "draft");
         if (signed) continue;
         const pkg = buildPackage(lp, store.state);
         const id = existing?.id || rid("el");
-        const doc = { lpId: lp.id, status: "draft", createdAt: new Date().toISOString(), createdBy: RT.meId, ...pkg, signoff: null, sentAt: null, choices: {} };
+        const doc = { lpId: lp.id, status: "draft", createdAt: new Date().toISOString(), createdBy: RT.meId, ...pkg, signoff: null, sentAt: null, choices: {}, lettersInReview: inReview.map((l) => l.id) };
         await put("elections/" + id, doc);
-        await appendAudit(existing ? "election.regenerated" : "election.generated", "election", id, `${existing ? "Regenerated" : "Generated"} MFN election package for ${lp.name}: ${pkg.items.length} items offered, ${pkg.notIncluded.length} not eligible, of ${pkg.considered} electable`, { items: pkg.items.map((i) => ({ key: i.key, eligibility: i.eligibility })), notIncluded: pkg.notIncluded.map((n) => n.key), hash: await itemsHash(pkg.items) });
+        await appendAudit(existing ? "election.regenerated" : "election.generated", "election", id, `${existing ? "Regenerated" : "Generated"} MFN election worksheet for ${lp.name}: ${pkg.items.length} items offered or awaiting a decision, ${pkg.notIncluded.length} not eligible, of ${pkg.considered} electable${inReview.length ? `; ${inReview.length} letters in review left out` : ""}`, { items: pkg.items.map((i) => ({ key: i.key, eligibility: i.eligibility })), notIncluded: pkg.notIncluded.map((n) => n.key), lettersInReview: inReview.map((l) => l.id), hash: await itemsHash(pkg.items) });
       }
-      toast("ok", "Packages generated. Each needs counsel sign-off before it is sent.");
+      toast("ok", `Worksheets generated for ${ready.length} LPs${waiting.length ? `; ${waiting.length} waiting for letter review` : ""}. Each needs counsel sign-off.`);
     });
   }
   const signedCount = s.elections.filter((e) => e.status !== "draft").length;
+  const archived = s.all.elections.filter((e) => e.archived);
   return html`<div class="stack">
-    <p class="muted">Usually done after the final close. Each package is built from the database: every approved, electable term held by other LPs is either offered or listed with the reason it isn't. All-or-nothing bundles are offered whole.</p>
-    <div class="row"><button class="btn primary" disabled=${s.readOnly || !withMfn.length} onClick=${() => generate(withMfn)}>Generate packages for ${withMfn.length} LPs with MFN</button>
-      ${signedCount ? html`<span class="small muted">${signedCount} signed-off packages are locked and won't be regenerated.</span>` : null}</div>
-    ${s.elections.length ? [...s.elections].sort((a, b) => lpName(a.lpId).localeCompare(lpName(b.lpId))).map((e) => html`<${PackageCard} key=${e.id} e=${e} />`) : html`<${Empty} title="No packages yet">Generate them when the fund is ready to run the MFN process.<//>`}
+    <p class="note">Internal working list: do not send to the LP. Each worksheet names which LP holds every term and lists the terms this LP can't claim. The election package sent to an LP is prepared separately from its offered items.</p>
+    <p class="muted">Usually done after the final close. Every approved, electable term held by other LPs is offered, marked "Needs a decision", or listed with the reason it isn't eligible. All-or-nothing bundles are offered whole.</p>
+    ${inReview.length ? html`<div class="note warn"><p><strong>${inReview.length} side ${inReview.length === 1 ? "letter is" : "letters are"} still in review:</strong> ${inReview.map((l) => lpName(l.lpId)).join(", ")}.</p>
+      <p>Their draft terms won't appear in any worksheet${waiting.length ? `, and ${waiting.map((l) => l.name).join(", ")} ${waiting.length === 1 ? "gets" : "get"} no worksheet until ${waiting.length === 1 ? "its letter is" : "their letters are"} approved` : ""}. You can wait and finish the reviews first, or generate now for the other ${ready.length} LPs.</p>
+      <div class="row"><a class="btn" href="#review">Go to the review queue</a><button class="btn" disabled=${s.readOnly || !ready.length} onClick=${generate}>Generate anyway for ${ready.length} LPs</button></div></div>`
+    : html`<div class="row"><button class="btn primary" disabled=${s.readOnly || !ready.length} onClick=${generate}>Generate worksheets for ${ready.length} LPs with MFN</button></div>`}
+    ${signedCount ? html`<span class="small muted">${signedCount} signed-off worksheets are locked and won't be regenerated.</span>` : null}
+    ${waiting.length ? html`<p class="small muted">Waiting for letter review: ${waiting.map((l) => l.name).join(", ")}.</p>` : null}
+    ${s.elections.length ? [...s.elections].sort((a, b) => lpName(a.lpId).localeCompare(lpName(b.lpId))).map((e) => html`<${PackageCard} key=${e.id} e=${e} />`) : html`<${Empty} title="No worksheets yet">Generate them when the fund is ready to run the MFN process.<//>`}
+    ${archived.length ? html`<details class="card"><summary>${archived.length} archived ${archived.length === 1 ? "worksheet" : "worksheets"}</summary>
+      <ul class="small">${archived.map((e) => html`<li key=${e.id}>${lpName(e.lpId)} · generated ${fmtTime(e.createdAt)} · archived ${fmtTime(e.archived.at)}${e.archived.reason ? ` (${e.archived.reason})` : ""} <${RestoreButton} col="elections" rec=${e} label=${lpName(e.lpId) + "'s worksheet"} /></li>`)}</ul></details>` : null}
   </div>`;
+}
+
+/* Archive and restore: records stay in the database and the audit log; archived ones drop out of working lists. */
+async function setArchived(col, rec, label, on, reason) {
+  return act(on ? "Archiving" : "Restoring", async () => {
+    await patch(col + "/" + rec.id, { archived: on ? { at: new Date().toISOString(), by: RT.meId, reason: reason || "" } : null });
+    const kind = { lps: "lp", letters: "letter", elections: "election" }[col];
+    await appendAudit(kind + (on ? ".archived" : ".restored"), kind, rec.id, `${on ? "Archived" : "Restored"} ${label}${on && reason ? ": " + reason : ""}`, { reason: reason || "" });
+    toast("ok", `${on ? "Archived" : "Restored"} ${label}.`);
+  });
+}
+function ArchiveButton({ col, rec, label, disabled }) {
+  const s = useStore();
+  const [open, setOpen] = useState(false); const [why, setWhy] = useState("");
+  if (s.readOnly) return null;
+  return open ? html`<span class="row"><input id=${"arch-" + rec.id} type="text" placeholder="Why archive? (optional)" value=${why} onInput=${(e) => setWhy(e.target.value)} />
+      <button class="btn small" onClick=${async () => { await setArchived(col, rec, label, true, why.trim()); setOpen(false); }}>Archive ${label}</button><button class="btn small ghost" onClick=${() => setOpen(false)}>Cancel</button></span>`
+    : html`<button class="btn small ghost" disabled=${disabled} onClick=${() => setOpen(true)}>Archive</button>`;
+}
+function RestoreButton({ col, rec, label }) {
+  const s = useStore();
+  return s.readOnly ? null : html`<button class="btn small ghost" onClick=${() => setArchived(col, rec, label, false)}>Restore</button>`;
 }
 
 function PackageCard({ e }) {
@@ -1805,7 +2128,7 @@ function PackageCard({ e }) {
   async function markSent() {
     await act("Recording", async () => {
       await patch("elections/" + e.id, { status: "sent", sentAt: sentDate });
-      await appendAudit("election.sent", "election", e.id, `Recorded ${lp?.name}'s package as sent on ${sentDate}`, { sentAt: sentDate });
+      await appendAudit("election.sent", "election", e.id, `Recorded ${lp?.name}'s election package as sent on ${sentDate}`, { sentAt: sentDate });
     });
   }
   async function record(key, choice) {
@@ -1817,10 +2140,11 @@ function PackageCard({ e }) {
     });
   }
   const stPill = { draft: ["warn", "Draft"], signed_off: ["info", "Signed off by counsel"], sent: ["info", "Sent"], responded: ["ok", "Elections recorded"] }[e.status] || ["neutral", e.status];
+  const archiveBtn = e.status === "draft" ? html`<${ArchiveButton} col="elections" rec=${e} label=${(lp?.name || "this LP") + "'s worksheet"} />` : null;
   const intact = !e.signoff || hashNow === e.signoff.hash;
   return html`<article class="card pkg">
     <header class="pkg-h"><div><h3>${lp?.name || "Unknown LP"}</h3><p class="small muted">${mfnSummary(lp || {})} · generated ${fmtTime(e.createdAt)}</p></div>
-      <div class="row"><${Pill} kind=${stPill[0]}>${stPill[1]}<//>${e.signoff ? (intact ? html`<${Pill} kind="ok">Unchanged since sign-off<//>` : html`<${Pill} kind="bad">Changed after sign-off<//>`) : null}</div></header>
+      <div class="row">${archiveBtn}<${Pill} kind=${stPill[0]}>${stPill[1]}<//>${e.signoff ? (intact ? html`<${Pill} kind="ok">Unchanged since sign-off<//>` : html`<${Pill} kind="bad">Changed after sign-off<//>`) : null}</div></header>
     <p class="small"><strong class="num">${e.considered}</strong> electable items held by other LPs considered: <strong class="num">${offered.length}</strong> offered, <strong class="num">${undecided.length}</strong> awaiting a decision, <strong class="num">${(e.items || []).filter((i) => i.decision === "exclude").length + (e.notIncluded || []).length}</strong> not offered (reasons below).</p>
     ${changedSince ? html`<p class="note warn">Approved terms have changed since this draft was generated. Regenerate before sign-off.</p>` : null}
     <button class="linkbtn" onClick=${() => setOpen(!open)}>${open ? "Hide details" : "Show items"}</button>
@@ -1867,9 +2191,9 @@ function LpsView() {
     await act("Saving LP", async () => {
       const before = s.lps.find((l) => l.id === edit.id);
       const doc = { name: edit.name.trim(), type: edit.type, commitmentUsd: Math.round(Number(edit.commitmentM) * 1e6), vehicle: edit.vehicle, close: edit.close,
-        mfn: { hasMfn: edit.hasMfn, basis: edit.basis, thresholdUsd: edit.thresholdM === "" || edit.thresholdM == null ? null : Math.round(Number(edit.thresholdM) * 1e6), excludedCategories: edit.excludedCategories, excludedTermIds: before?.mfn?.excludedTermIds || [], note: edit.note } };
+        mfn: { hasMfn: edit.hasMfn, basis: edit.basis, thresholdUsd: edit.thresholdM === "" || edit.thresholdM == null ? null : Math.round(Number(edit.thresholdM) * 1e6), excludedCategories: edit.excludedCategories, excludedGrantBases: edit.excludedGrantBases || [], excludedTermIds: before?.mfn?.excludedTermIds || [], note: edit.note, ...(before?.mfn?.fromLetterId ? { fromLetterId: before.mfn.fromLetterId } : {}) } };
       await put("lps/" + edit.id, doc);
-      await appendAudit("lp.updated", "lp", edit.id, `Updated LP ${doc.name} and its MFN setup`, { before: before ? { commitmentUsd: before.commitmentUsd, mfn: before.mfn, type: before.type } : null, after: { commitmentUsd: doc.commitmentUsd, mfn: doc.mfn, type: doc.type } });
+      await appendAudit(before ? "lp.updated" : "lp.created", "lp", edit.id, before ? `Updated LP ${doc.name} and its MFN setup` : `Added LP ${doc.name} (${C.usd(doc.commitmentUsd)})`, { before: before ? { commitmentUsd: before.commitmentUsd, mfn: before.mfn, type: before.type } : null, after: { commitmentUsd: doc.commitmentUsd, mfn: doc.mfn, type: doc.type } });
       setEdit(null); toast("ok", "LP saved.");
     });
   }
@@ -1881,7 +2205,7 @@ function LpsView() {
       setEditB(null);
     });
   }
-  const startEdit = (l) => setEdit({ id: l.id, name: l.name, type: l.type, commitmentM: l.commitmentUsd / 1e6, vehicle: l.vehicle, close: l.close || "", hasMfn: !!l.mfn?.hasMfn, basis: l.mfn?.basis || "size", thresholdM: l.mfn?.thresholdUsd != null ? l.mfn.thresholdUsd / 1e6 : "", excludedCategories: l.mfn?.excludedCategories || [], note: l.mfn?.note || "" });
+  const startEdit = (l) => setEdit({ id: l.id, name: l.name, type: l.type, commitmentM: l.commitmentUsd / 1e6, vehicle: l.vehicle, close: l.close || "", hasMfn: !!l.mfn?.hasMfn, basis: l.mfn?.basis || "size", thresholdM: l.mfn?.thresholdUsd != null ? l.mfn.thresholdUsd / 1e6 : "", excludedCategories: l.mfn?.excludedCategories || [], excludedGrantBases: l.mfn?.excludedGrantBases || [], note: l.mfn?.note || "" });
   const total = s.lps.reduce((a, l) => a + (l.commitmentUsd || 0), 0);
   return html`<section class="view">
     <div class="view-h"><div><h1>LPs</h1><p class="muted">${s.lps.length} LPs · ${C.usd(total)} committed. Each LP keeps its own MFN rules; nothing is hard-coded.</p></div>
@@ -1897,17 +2221,21 @@ function LpsView() {
         ${edit.hasMfn ? html`
           <${Field} label="MFN basis" wide><${Seg} value=${edit.basis} onChange=${(v) => setEdit({ ...edit, basis: v })} options=${[["size", "Terms from LPs at or below a commitment limit"], ["all", "All LPs' terms"], ["manual", "Case by case"]]} /><//>
           ${edit.basis === "size" ? html`<${Field} label="Commitment limit ($M)" hint="Blank = this LP's own commitment"><input id="lp-thr" type="number" value=${edit.thresholdM} onInput=${(e) => setEdit({ ...edit, thresholdM: e.target.value })} /><//>` : null}
-          <${Field} label="Categories excluded from this LP's MFN" wide><${Toggles} values=${edit.excludedCategories} options=${categoryList().map((c) => [c.id, c.name])} onChange=${(v) => setEdit({ ...edit, excludedCategories: v })} /><//>
+          <${Field} label="Carve-outs by category" wide><${Toggles} values=${edit.excludedCategories} options=${categoryList().map((c) => [c.id, c.name])} onChange=${(v) => setEdit({ ...edit, excludedCategories: v })} /><//>
+          <${Field} label="Carve-outs by grant basis" wide hint="Terms granted for these reasons can't be claimed by this LP"><${Toggles} values=${edit.excludedGrantBases || []} options=${C.GRANT_BASES} onChange=${(v) => setEdit({ ...edit, excludedGrantBases: v })} /><//>
           <${Field} label="Notes on unusual MFN terms" wide><input id="lp-note" type="text" value=${edit.note} onInput=${(e) => setEdit({ ...edit, note: e.target.value })} /><//>` : null}
       </div>
-      <div class="row end"><button class="btn ghost" onClick=${() => setEdit(null)}>Cancel</button><button class="btn primary" disabled=${!edit.name.trim() || !(Number(edit.commitmentM) > 0)} onClick=${saveLp}>Save</button></div></div>` : null}
+      <div class="row end">${!edit.isNew ? html`<${ArchiveButton} col="lps" rec=${{ id: edit.id }} label=${edit.name} />` : null}<button class="btn ghost" onClick=${() => setEdit(null)}>Cancel</button><button class="btn primary" disabled=${!edit.name.trim() || !(Number(edit.commitmentM) > 0)} onClick=${saveLp}>Save</button></div>
+      ${!edit.isNew ? html`<p class="small muted">Archiving takes this LP, its side letters and their terms out of totals, alerts, worksheets and search. It can be restored.</p>` : null}</div>` : null}
     <div class="tablewrap"><table class="tbl"><thead><tr><th>LP</th><th>Type</th><th>Commitment</th><th>Vehicle</th><th>Closing</th><th>MFN setup</th><th>Terms</th><th></th></tr></thead><tbody>
       ${[...s.lps].sort((a, b) => b.commitmentUsd - a.commitmentUsd).map((l) => html`<tr key=${l.id}><td>${l.name}${l.mfn?.note ? html`<div class="small muted">${l.mfn.note}</div>` : null}</td><td>${LP_TYPES[l.type] || l.type}</td><td class="num">${C.usd(l.commitmentUsd)}</td><td>${l.vehicle}</td><td>${l.close}</td>
         <td class="small">${mfnSummary(l)}</td><td class="num">${s.terms.filter((t) => t.lpId === l.id && t.status === "approved").length}</td><td><button class="btn small" disabled=${s.readOnly} onClick=${() => startEdit(l)}>Edit</button></td></tr>`)}
     </tbody></table></div>
+    ${s.all.lps.some((l) => l.archived) ? html`<details class="card"><summary>${s.all.lps.filter((l) => l.archived).length} archived LPs</summary>
+      <ul class="small">${s.all.lps.filter((l) => l.archived).map((l) => html`<li key=${l.id}>${l.name} · ${C.usd(l.commitmentUsd)} · archived ${fmtTime(l.archived.at)} by ${nameOf(l.archived.by)}${l.archived.reason ? ` (${l.archived.reason})` : ""} <${RestoreButton} col="lps" rec=${l} label=${l.name} /></li>`)}</ul></details>` : null}
     <h2>Bundles</h2>
     <p class="muted">Terms granted together, or benefits tied to conditions. All-or-nothing bundles are offered whole in MFN packages.</p>
-    <div class="stack">${s.bundles.map((b) => html`<div class="card bundle-card" key=${b.id}>
+    <div class="stack">${s.bundles.filter((b) => s.lps.some((l) => l.id === b.lpId)).map((b) => html`<div class="card bundle-card" key=${b.id}>
       ${editB?.id === b.id ? html`<div class="grid2"><${Field} label="Name"><input id=${"bn-" + b.id} type="text" value=${editB.name} onInput=${(e) => setEditB({ ...editB, name: e.target.value })} /><//>
         <label class="check"><input id=${"ba-" + b.id} type="checkbox" checked=${editB.allOrNothing} onChange=${(e) => setEditB({ ...editB, allOrNothing: e.target.checked })} /> All-or-nothing</label>
         <${Field} label="Why these go together" wide><input id=${"bt-" + b.id} type="text" value=${editB.note} onInput=${(e) => setEditB({ ...editB, note: e.target.value })} /><//></div>
@@ -2002,7 +2330,7 @@ function QualityView() {
     const terms = s.terms.filter((t) => t.letterId === l.id && t.status === "approved");
     await act("Adding test case", async () => {
       const id = "tc-" + l.id.slice(3);
-      await put("tests/" + id, { name: lp.name, lpName: lp.name, lpType: lp.type, vehicle: l.vehicle, paragraphs: l.paragraphs, expected: terms.map((t) => ({ category: t.category, quote: t.quote, mfnStatus: t.mfnStatus, lpStatusBased: t.lpStatusBased })), expectedNoObligation: l.noObligation || [], sourceLetterId: l.id, createdAt: new Date().toISOString(), createdBy: RT.meId });
+      await put("tests/" + id, { name: lp.name, lpName: lp.name, lpType: lp.type, vehicle: l.vehicle, paragraphs: l.paragraphs, expected: terms.map((t) => ({ category: t.category, quote: t.quote, mfnStatus: t.mfnStatus, grantBasis: C.grantBasesOf(t), lpStatusBased: t.lpStatusBased ?? null })), expectedNoObligation: l.noObligation || [], sourceLetterId: l.id, createdAt: new Date().toISOString(), createdBy: RT.meId });
       await appendAudit("testset.case_added", "test", id, `Added ${lp.name} letter to the test set (${terms.length} expected terms)`, { sourceLetterId: l.id });
       setAddLetter("");
     });
